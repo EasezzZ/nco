@@ -2217,16 +2217,18 @@ out returns [var_sct *var]
            { var=ncap_var_var_op(var1,var2, PLUS );}
 	|  (#(MINUS out out)) => #( MINUS var1=out var2=out)
             { var=ncap_var_var_op(var1,var2, MINUS );}
-    |  (#(UTIMES #(POST_INC out)))=> #( UTIMES #(POST_INC var1=out_asn)){
+    // |  (#(UTIMES #(POST_INC out)))=> #( UTIMES #(POST_INC var1=out_asn)){
+    |  (#(UTIMES #(POST_INC VAR_ID)))=> #( UTIMES #(POST_INC var1=out)){
              var=ncap_var_var_inc(var1,NULL_CEWI,POST_INC,true,prs_arg);      
        } 
-    |  (#(UTIMES #(POST_DEC out)))=> #( UTIMES #(POST_DEC var1=out_asn)){
+    //|  (#(UTIMES #(POST_DEC out)))=> #( UTIMES #(POST_DEC var1=out_asn)){
+    |  (#(UTIMES #(POST_DEC VAR_ID)))=> #( UTIMES #(POST_DEC var1=out)){
              var=ncap_var_var_inc(var1,NULL_CEWI,POST_DEC,true,prs_arg);      
        } 
-    |  (#(UTIMES #(INC out)))=> #( UTIMES #(INC var1=out_asn)){
+    |  (#(UTIMES #(INC VAR_ID)))=> #( UTIMES #(INC var1=out)){
              var=ncap_var_var_inc(var1,NULL_CEWI,INC,true,prs_arg);      
        } 
-    |  (#(UTIMES #(DEC out)))=> #( UTIMES #(DEC var1=out_asn)){
+    |  (#(UTIMES #(DEC VAR_ID)))=> #( UTIMES #(DEC var1=out)){
              var=ncap_var_var_inc(var1,NULL_CEWI,DEC,true,prs_arg);      
        } 
 
@@ -2270,7 +2272,7 @@ out returns [var_sct *var]
     | #(GEQ  var1=out var2=out)   
             { var=ncap_var_var_op(var1,var2, GEQ );}
     | #(LEQ  var1=out var2=out)   
-            { var=ncap_var_var_op(var1,var2, LEQ );}
+             { var=ncap_var_var_op(var1,var2, LEQ );}
     | #(EQ  var1=out var2=out)    
             { var=ncap_var_var_op(var1,var2, EQ );}
     | #(NEQ  var1=out var2=out)   
@@ -2281,21 +2283,41 @@ out returns [var_sct *var]
     | #(FGTHAN  var1=out var2=out) 
             { var=ncap_var_var_op(var1,var2, FGTHAN );}
     // Assign Operators 
-    | #(PLUS_ASSIGN pls_asn:. var2=out) {
-       var1=out_asn(pls_asn);
-       var=ncap_var_var_inc(var1,var2, PLUS_ASSIGN ,(pls_asn->getType()==UTIMES), prs_arg);
+    // | #(PLUS_ASSIGN pls_asn:. var2=out) {
+    //    var1=out_asn(pls_asn);
+    //    var=ncap_var_var_inc(var1,var2, PLUS_ASSIGN ,(pls_asn->getType()==UTIMES), prs_arg);
+    //    }
+    // Assign Operators 
+    
+    | ( #(PLUS_ASSIGN  (VAR_ID|ATT_ID)  var2=out)) => #(PLUS_ASSIGN var1=out  var2=out)  {
+       var=ncap_var_var_inc(var1,var2,PLUS_ASSIGN ,false, prs_arg);
        }
-	| #(MINUS_ASSIGN min_asn:. var2=out){
-       var1=out_asn(min_asn);
-       var=ncap_var_var_inc(var1,var2, MINUS_ASSIGN ,(min_asn->getType()==UTIMES), prs_arg);
+
+    | (#(PLUS_ASSIGN  #(UTIMES VAR_ID) var2=out)) => #(PLUS_ASSIGN  #(UTIMES var1=out)  var2=out)  {
+       var=ncap_var_var_inc(var1,var2, PLUS_ASSIGN ,true, prs_arg);
        }
-	| #(TIMES_ASSIGN tim_asn:. var2=out){       
-       var1=out_asn(tim_asn);
-       var=ncap_var_var_inc(var1,var2, TIMES_ASSIGN ,(tim_asn->getType()==UTIMES), prs_arg);
+    | ( #(MINUS_ASSIGN  (VAR_ID|ATT_ID)  var2=out)) => #(MINUS_ASSIGN  var1=out  var2=out)  {
+       var=ncap_var_var_inc(var1,var2, MINUS_ASSIGN ,false, prs_arg);
        }
-	| #(DIVIDE_ASSIGN div_asn:. var2=out){	
-       var1=out_asn(div_asn);
-       var=ncap_var_var_inc(var1,var2, DIVIDE_ASSIGN ,(div_asn->getType()==UTIMES), prs_arg);
+
+    | (#(MINUS_ASSIGN #(UTIMES VAR_ID) var2=out)) => #(MINUS_ASSIGN #(UTIMES var1=out)  var2=out)  {
+       var=ncap_var_var_inc(var1,var2, MINUS_ASSIGN ,true, prs_arg);
+       }
+
+    | (#(TIMES_ASSIGN  (VAR_ID|ATT_ID)  var2=out)) => #(TIMES_ASSIGN  var1=out  var2=out)  {
+       var=ncap_var_var_inc(var1,var2, TIMES_ASSIGN ,false, prs_arg);
+       }
+
+    | (#(TIMES_ASSIGN #(UTIMES VAR_ID) var2=out)) => #(TIMES_ASSIGN #(UTIMES var1=out)  var2=out)  {
+       var=ncap_var_var_inc(var1,var2, TIMES_ASSIGN ,true, prs_arg);
+       }
+
+    | (#(DIVIDE_ASSIGN  (VAR_ID|ATT_ID)  var2=out)) => #(DIVIDE_ASSIGN  var1=out  var2=out)  {
+       var=ncap_var_var_inc(var1,var2, DIVIDE_ASSIGN ,false, prs_arg);
+       }
+
+    | (#(DIVIDE_ASSIGN #(UTIMES VAR_ID) var2=out)) => #(DIVIDE_ASSIGN #(UTIMES var1=out)  var2=out)  {
+       var=ncap_var_var_inc(var1,var2, DIVIDE_ASSIGN ,true, prs_arg);
        }
 
     | #(ASSIGN asn:. ) 
@@ -2544,7 +2566,8 @@ out returns [var_sct *var]
     // plain Variable
 	|   v:VAR_ID       
         { 
-
+          //dbg_prn(fnc_nm,"getting regular var in out "+v->getText());
+   
           var=prs_arg->ncap_var_init(v->getText(),true);
           if(var== NULL){
                if(prs_arg->ntl_scn){
@@ -2680,7 +2703,6 @@ out returns [var_sct *var]
 // #endif /* !ENABLE_NETCDF4 */
 
 ;
-
 // Return a var or att WITHOUT applying a cast 
 // and checks that the operand is a valid Lvalue
 // ie that the var or att has NO children!!
