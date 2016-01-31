@@ -3380,68 +3380,65 @@ double bil_cls::clc_lin_ipl(double x1,double x2, double x, double Q0,double Q1){
   if(nbr_args!=2)
     err_prn(sfnm, " Function has been called with wrong number of arguments arguments\n"+susg); 
 
-  
-
+  // get var to push
+  var_add=walker.out(vtr_args[1]);
+             
 
 
   // deal with call by ref 
   if(vtr_args[0]->getType() == CALL_REF )     
   {   
-    bret=false; 
+
+    bret=false;   
+    // final scan starts here   
+     att_nm=vtr_args[0]->getFirstChild()->getText();  
+
+    // do nothing on initial scan with call-by ref 
+    if(prs_arg->ntl_scn)
+    { 
+      nco_var_free(var_add);  
+      var=ncap_sclr_var_mk(att_nm,(nc_type)NC_INT,false);  
+      return var;
+    }
+
+    Nvar=prs_arg->var_vtr.find(att_nm);
+
+    if(Nvar !=NULL)
+      var_att=nco_var_dpl(Nvar->var);
+    else    
+      var_att=ncap_att_init(att_nm,prs_arg);
+  
+    // if new var then write var - end of story   
+    if(!var_att) 
+    {   
+	nco_free(var_add->nm);
+	var_add->nm=strdup(att_nm.c_str());      
+	Nvar=new NcapVar(var_add,att_nm);
+
+	var=ncap_sclr_var_mk(att_nm,(nco_int)var_add->sz);
+	prs_arg->var_vtr.push_ow(Nvar);       
+
+	return var;
+    } 
+
   }
+  // deal with regular argument
   else
   {
-    var_att=walker.out(vtr_args[0]);      
     bret=true;
-  }
-
-  var_add=walker.out(vtr_args[1]);
-
-  // inital scan just return udf
-  if(prs_arg->ntl_scn)
-  {
-    if(var_att)
-       nco_var_free(var_att);
-     
-    nco_var_free(var_add);        
-
-    if( bret) 
-      var=ncap_var_udf("~zz@join_methods");  
-    else
-      var=ncap_sclr_var_mk(std::string(var_add->nm),(nc_type)NC_INT,false);  
-
-    return var;
-  }
-
-  // deal with call by ref final scan
-  if( !bret)
-  {     
-     att_nm=vtr_args[0]->getFirstChild()->getText();  
-     
-
-     Nvar=prs_arg->var_vtr.find(att_nm);
-
-
-     if(Nvar !=NULL)
-         var_att=nco_var_dpl(Nvar->var);
-     else    
-        var_att=ncap_att_init(att_nm,prs_arg);
+    var_att=walker.out(vtr_args[0]);      
   
-     // if new var then write var - end of story   
-     if(!var_att) 
-     {   
-       nco_free(var_add->nm);
-       var_add->nm=strdup(att_nm.c_str());      
-       Nvar=new NcapVar(var_add,att_nm);
+    if(prs_arg->ntl_scn) 
+    {   
+     nco_var_free(var_add);
+     nco_var_free(var_att);
+     var=ncap_var_udf("~zz@join_methods");  
+     return var; 
+    
+    } 
+  }
 
-       var=ncap_sclr_var_mk(att_nm,(nco_int)var_add->sz);
-       prs_arg->var_vtr.push_ow(Nvar);       
-
-       return var;
-
-     } 
-
-  } 
+  
 
   if(!var_att )
      err_prn(sfnm, " first argument has evaluated to null\n"+susg); 
