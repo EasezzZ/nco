@@ -2319,46 +2319,44 @@ out returns [var_sct *var]
     | (#(DIVIDE_ASSIGN #(UTIMES VAR_ID) var2=out)) => #(DIVIDE_ASSIGN #(UTIMES var1=out)  var2=out)  {
        var=ncap_var_var_inc(var1,var2, DIVIDE_ASSIGN ,true, prs_arg);
        }
-
-    | #(ASSIGN asn:. ) 
-            {
+    | (#(ASSIGN (VAR_ID|ATT_ID))) => #(ASSIGN asn:.) {
+             if(prs_arg->ntl_scn)
+               var=assign_ntl(asn,false); 
+             else
+               var=assign(asn,false);
+      }
+    | #(ASSIGN #(asn2:UTIMES VAR_ID) ) {
               // Check for RAM variable - if present 
               // change tree - for example from:
               //     ( EXPR ( = ( * n1 ) ( + four four ) ) )
               // to  ( EXPR ( = n1 ( + four four ) ) )
              RefAST tr;
-             bool bram;
              NcapVar *Nvar;
 
-             if(asn->getType()==UTIMES){
-               tr=asn->getFirstChild();
-               tr->setNextSibling(asn->getNextSibling());
-               bram=true;
-             } else { 
-               tr=asn; 
-               bram=false;
-             }
+             tr=asn2->getFirstChild();
+             tr->setNextSibling(asn2->getNextSibling());
              
              // Die if attempting to create a RAM var 
              // from an existing disk var   
              Nvar= prs_arg->var_vtr.find(tr->getText());
 
-             if(bram && tr->getType()==VAR_ID && Nvar && Nvar->flg_mem==false){
+             if(Nvar && Nvar->flg_mem==false)
+             {
               std::string serr;
               serr= "It is impossible to recast disk variable: \"" + tr->getText() +"\" as a RAM variable.";
               err_prn(fnc_nm,serr );       
-              }                
+             }                
 
              if(prs_arg->ntl_scn)
-               var=assign_ntl(tr,bram); 
+               var=assign_ntl(tr,true); 
              else
-               var=assign(tr,bram);
+               var=assign(tr,true);
                
             }  
      | #(WHERE_ASSIGN wasn:. ) {
 
      }
-
+    
     //ternary Operator
      |   #(QUESTION var1=out qus:.) {
            bool br;
