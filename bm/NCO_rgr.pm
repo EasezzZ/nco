@@ -785,7 +785,7 @@ print "\n";
 # 544.4 = (file 1 tas1) 272.1 + (file 2 tas1) 272.3
     $dsc_sng="(Groups) Process ensembles in both files mdl_1.nc mdl_2.nc";
     $tst_cmd[0]="ncbo -O --op_typ=add $fl_fmt $nco_D_flg $in_pth_arg mdl_1.nc mdl_2.nc %tmp_fl_00%";
-	$tst_cmd[1]="ncks -C -g cesm_01 -v tas1 %tmp_fl_00%";
+    $tst_cmd[1]="ncks -C -g cesm_01 -v tas1 %tmp_fl_00%";
     $tst_cmd[2]="time[3]=4 tas1[3]=544.4";
     $tst_cmd[3]="SS_OK";   
     NCO_bm::tst_run(\@tst_cmd);
@@ -796,7 +796,7 @@ print "\n";
 #ncks -g cesm_01 -v time ~/foo.nc
     $dsc_sng="(Groups) Process ensembles in both files mdl_1.nc mdl_2.nc (check fixed variables)";
     $tst_cmd[0]="ncbo -O $fl_fmt $nco_D_flg $in_pth_arg mdl_1.nc mdl_2.nc %tmp_fl_00%";
-	$tst_cmd[1]="ncks -g cesm_01 -v time %tmp_fl_00%";
+    $tst_cmd[1]="ncks -g cesm_01 -v time %tmp_fl_00%";
     $tst_cmd[2]="time[3]=4";
     $tst_cmd[3]="SS_OK";   
     NCO_bm::tst_run(\@tst_cmd);
@@ -808,7 +808,7 @@ print "\n";
 # 544.1 = (file 1 tas1) 272.1 + (file 2 tas1) 273.0
     $dsc_sng="(Groups) Process ensembles in file 1 with common variable at root in file 2";
     $tst_cmd[0]="ncbo -O --op_typ=add $fl_fmt $nco_D_flg $in_pth_arg mdl_1.nc obs.nc %tmp_fl_00%";
-	$tst_cmd[1]="ncks -C -g cesm_01 -v tas1 %tmp_fl_00%";
+    $tst_cmd[1]="ncks -C -g cesm_01 -v tas1 %tmp_fl_00%";
     $tst_cmd[2]="time[3]=4 tas1[3]=545.1";
     $tst_cmd[3]="SS_OK";   
     NCO_bm::tst_run(\@tst_cmd);
@@ -819,12 +819,11 @@ print "\n";
 #ncks -g ecmwf_01 -v time
     $dsc_sng="(Groups) Process ensembles in file 1 with common variable at root in file 2 (check fixed variables)";
     $tst_cmd[0]="ncbo -O $fl_fmt $nco_D_flg $in_pth_arg mdl_1.nc obs.nc %tmp_fl_00%";
-	$tst_cmd[1]="ncks -g ecmwf_01 -v time %tmp_fl_00%";
+    $tst_cmd[1]="ncks -g ecmwf_01 -v time %tmp_fl_00%";
     $tst_cmd[2]="time[3]=4";
     $tst_cmd[3]="SS_OK";   
     NCO_bm::tst_run(\@tst_cmd);
     $#tst_cmd=0; # Reset array 	
-
 	
 # ncbo 
 #ncbo -O --op_typ=add  obs.nc mdl_1.nc ~/foo.nc
@@ -882,9 +881,9 @@ print "\n";
 #result =
 # 544.25 = 272.15 + 272.1
     $dsc_sng="(Groups) Ensemble with 1 member (mdl_3.nc)";
-	$tst_cmd[0]="ncra -Y ncge -O $fl_fmt $nco_D_flg $in_pth_arg mdl_3.nc %tmp_fl_00%";
+    $tst_cmd[0]="ncra -Y ncge -O $fl_fmt $nco_D_flg $in_pth_arg mdl_3.nc %tmp_fl_00%";
     $tst_cmd[1]="ncbo --op_typ=add -O $fl_fmt $nco_D_flg %tmp_fl_00% $in_pth/mdl_3.nc %tmp_fl_01%";
-	$tst_cmd[2]="ncks -H -C -g cesm_01 -v tas1 %tmp_fl_01%";
+    $tst_cmd[2]="ncks -H -C -g cesm_01 -v tas1 %tmp_fl_01%";
     $tst_cmd[3]="time[3] tas1[3]=544.25";
     $tst_cmd[4]="SS_OK";   
     NCO_bm::tst_run(\@tst_cmd);
@@ -1113,7 +1112,6 @@ print "\n";
     NCO_bm::tst_run(\@tst_cmd);
     $#tst_cmd=0; # Reset array
 
-# NEW NCO 4.4.2
 #nces #19 (check coordinate variables)
 # ncra -Y ncge -h -O mdl_1.nc ~/foo.nc
 # ncks -g cesm -v time ~/foo.nc
@@ -1126,7 +1124,6 @@ print "\n";
     NCO_bm::tst_run(\@tst_cmd);
     $#tst_cmd=0; # Reset array
 
-# NEW NCO 4.4.3
 #nces #20 (error checking of ensemble variable dimensions)
 #  ncra -Y ncge -O in_grp_4.nc in_grp_5.nc ~/foo.nc
 	
@@ -1137,7 +1134,6 @@ print "\n";
     NCO_bm::tst_run(\@tst_cmd);
     $#tst_cmd=0; # Reset array
 
-# NEW NCO 4.4.3
 #nces #21 
 # ncra -Y ncge -h -O mdl_1.nc ~/foo.nc
 	
@@ -1148,6 +1144,19 @@ print "\n";
     $tst_cmd[3]="SS_OK";
     NCO_bm::tst_run(\@tst_cmd);
     $#tst_cmd=0; # Reset array
+	
+#nces #22 
+# ncks mdl_1.nc -v /cesm/cesm_02/time | grep 'time attribute 0: long_name'
+# ncra -Y ncge -O --nsm_grp -p ~/nco/data mdl_1.nc ~/foo.nc
+# ncks -v /cesm/time ~/foo.nc | grep 'time attribute 0: long_name'
+
+    $dsc_sng="(Groups) Test copy of attributes for coordinate variables (time)";
+    $tst_cmd[0]="ncra -Y ncge $omp_flg -O --nsm_grp $fl_fmt $nco_D_flg $in_pth_arg mdl_1.nc %tmp_fl_00%";
+    $tst_cmd[1]="ncks -v /cesm/time %tmp_fl_00% | grep 'time attribute 0: long_name'";
+    $tst_cmd[2]="time attribute 0: long_name, size = 4 NC_CHAR, value = time";
+    $tst_cmd[3]="SS_OK";
+    NCO_bm::tst_run(\@tst_cmd);
+    $#tst_cmd=0; # Reset array	
 
    } # #### Group Ensemble tests	
     
