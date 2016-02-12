@@ -175,11 +175,13 @@ out_fl='' # [sng] Output file
 out_xmp='out.nc' # [sng] Output file for examples
 par_typ='' # [sng] Parallelism type
 pdq_typ='' # [sng] Permutation type
-rgr_opt='--rgr lat_nm_out=lat --rgr lon_nm_out=lon' # [sng] Regridding options (e.g., '--rgr col_nm=lndgrid')
-tps_opt='' # [sng] TempestRemap options
+#rgr_opt='--rgr lat_nm_out=lat --rgr lon_nm_out=lon --rnr=0.0' # [sng] Regridding options
+rgr_opt='--rgr lat_nm_out=lat --rgr lon_nm_out=lon' # [sng] Regridding options
 thr_nbr=2 # [nbr] Thread number for regridder
-#var_lst='FSNT,AODVIS' # [sng] Variables to process (empty means all)
 tmp_out_fl='ncremap_grd_tmp.nc' # [sng] Temporary output file
+#tps_opt='--mono' # [sng] TempestRemap options
+tps_opt='' # [sng] TempestRemap options
+#var_lst='FSNT,AODVIS' # [sng] Variables to process (empty means all)
 var_lst='' # [sng] Variables to process (empty means all)
 var_xmp='FSNT' # [sng] Variable list for examples
 wgt_gnr='esmf' # [sng] Weight-generator program
@@ -292,6 +294,7 @@ if [ -n "${drc_usr}" ]; then
 fi # !drc_usr
 grd_dst_dfl="${drc_out}/ncremap_tmp_grd_dst.nc" # [sng] Grid-file (destination) default
 grd_src_dfl="${drc_out}/ncremap_tmp_grd_src.nc" # [sng] Grid-file (source) default
+hirdls_fl="${drc_out}/ncremap_tmp_hirdls.nc" # [sng] HIRDLS workflow default
 pdq_fl="${drc_out}/ncremap_tmp_pdq.nc" # [sng] Permuted data default
 tmp_out_fl="${drc_out}/${tmp_out_fl}" # [sng] Temporary output file
 if [ ${alg_typ} = 'bilinear' ] || [ ${alg_typ} = 'bln' ] ; then 
@@ -349,9 +352,9 @@ elif [ "${par_typ}" = 'mpi' ]; then
     par_opt=' &'
 fi # !par_typ
 if [ -n "${pdq_typ}" ]; then
-    if [ "${pdq_typ}" != 'airs' ] && [ "${pdq_typ}" != 'mpas' ] && [ "${pdq_typ}" != 'nil' ]; then 
+    if [ "${pdq_typ}" != 'airs' ] && [ "${pdq_typ}" != 'hirdls' ] && [ "${pdq_typ}" != 'mpas' ] && [ "${pdq_typ}" != 'nil' ]; then 
 	    echo "ERROR: Invalid -P pdq_typ option = ${pdq_typ}"
-	    echo "HINT: Valid pdq_typ arguments are 'airs', 'mpas', and 'nil'"
+	    echo "HINT: Valid pdq_typ arguments are 'airs', 'hirdls', 'mpas', and 'nil'"
 	    exit 1
     fi # !pdq_typ
 fi # !pdq_typ
@@ -435,24 +438,50 @@ if [ -z "${grd_sng}" ]; then
 else
     grd_sng_usr_flg='Yes'
 fi # !grd_sng
+if [ "${dst_usr_flg}" = 'Yes' ] || [ "${grd_sng_usr_flg}" = 'Yes' ] || [ "${grd_dst_usr_flg}" = 'Yes' ] || [ "${grd_src_usr_flg}" = 'Yes' ]; then
+    # Specified map-file will be created if -d, -G, -g, or -s was specified
+    map_mk='Yes'
+fi # !map_mk
 if [ -n "${map_fl}" ]; then 
-    if [ ! -e "${map_fl}" ]; then
-	echo "ERROR: Unable to find specified regrid map ${map_fl}"
-	echo "HINT: Supply the full path-name for the regridding map"
-	exit 1
-    fi # ! -e
     map_usr_flg='Yes'
-else
+    if [ "${map_mk}" = 'Yes' ]; then
+        if [ -e "${map_fl}" ]; then
+	    rsp_kbd_nbr=0
+	    while [ ${rsp_kbd_nbr} -lt 10 ] ; do
+		echo "WARNING: The file ${map_fl} already exists and will be over-written by the newly generated map-file."
+		read -p "Continue (y/n)? " rsp_kbd
+		let rsp_kbd_nbr+=1
+		case "${rsp_kbd}" in
+		    N*|n*) exit 1 ;;
+		    Y*|y*) break ;;
+		    *) continue ;;
+		esac
+	    done # !rsp_kbd_nbr
+	    if [ ${rsp_kbd_nbr} -ge 10 ]; then
+		echo "ERROR: Too many invalid responses, exiting"
+		exit 1
+	    fi # !rsp_kbd_nbr
+	fi # ! -e
+    else # !map_mk
+        if [ ! -e "${map_fl}" ]; then
+	    echo "ERROR: Unable to find specified regrid map ${map_fl}"
+	    echo "HINT: Supply a valid map-file (weight-file) name or supply the grid files or data files and let ncremap create a mapfile for you"
+	    exit 1
+	fi # ! -e
+    fi # !map_mk
+else # !map_fl
     if [ "${wgt_gnr}" = 'esmf' ]; then 
 	map_fl_dfl="${drc_out}/ncremap_tmp_map_${wgt_gnr}_${alg_opt}.nc" # [sng] Map-file default
     fi # !esmf
     if [ "${wgt_gnr}" = 'tempest' ]; then 
 	map_fl_dfl="${drc_out}/ncremap_tmp_map_${wgt_gnr}.nc" # [sng] Map-file default
-	msh_fl_dfl="${drc_out}/ncremap_tmp_msh_ovr_${wgt_gnr}.g" # [sng] Mesh-file default
-	msh_fl=${msh_fl_dfl}
     fi # !tempest
     map_fl=${map_fl_dfl}
 fi # !map_fl
+if [ "${map_mk}" = 'Yes' ] && [ "${wgt_gnr}" = 'tempest' ]; then 
+    msh_fl_dfl="${drc_out}/ncremap_tmp_msh_ovr_${wgt_gnr}.g" # [sng] Mesh-file default
+    msh_fl=${msh_fl_dfl}
+fi # !tempest
 
 if [ "${mpi_flg}" = 'Yes' ]; then
     if [ -n "${COBALT_NODEFILE}" ]; then 
@@ -472,11 +501,11 @@ if [ "${mpi_flg}" = 'Yes' ]; then
 	nd_nbr=${#nd_nm[@]}
 	for ((fl_idx=0;fl_idx<fl_nbr;fl_idx++)); do
 	    case "${HOSTNAME}" in 
-		cori* )
+		cori* | edison* | nid* )
 		    # NB: NERSC staff says srun automatically assigns to unique nodes even without "-L $node" argument?
 		    cmd_mpi[${fl_idx}]="srun -L ${nd_nm[$((${fl_idx} % ${nd_nbr}))]} -n 1" ; ;; # NERSC
-		edison* | hopper* | nid* )
-		    # NB: NERSC staff says aprun automatically assigns to unique nodes even without "-L $node" argument
+		hopper* )
+		    # NB: NERSC migrated from aprun to srun in 201601. Hopper commands will soon be deprecated.
 		    cmd_mpi[${fl_idx}]="aprun -L ${nd_nm[$((${fl_idx} % ${nd_nbr}))]} -n 1" ; ;; # NERSC
 		* )
 		    cmd_mpi[${fl_idx}]="mpirun -H ${nd_nm[$((${fl_idx} % ${nd_nbr}))]} -npernode 1 -n 1" ; ;; # Other
@@ -515,6 +544,7 @@ if [ ${dbg_lvl} -ge 2 ]; then
     printf "dbg: job_nbr  = ${job_nbr}\n"
     printf "dbg: in_fl    = ${in_fl}\n"
     printf "dbg: map_fl   = ${map_fl}\n"
+    printf "dbg: map_mk   = ${map_mk}\n"
     printf "dbg: mlt_map  = ${mlt_map_flg}\n"
     printf "dbg: mpi_flg  = ${mpi_flg}\n"
     printf "dbg: nco_opt  = ${nco_opt}\n"
@@ -552,50 +582,31 @@ if [ -f 'PET0.RegridWeightGen.Log' ]; then
 fi # !PETO
 printf "Started processing at `date`.\n"
 printf "NCO version is ${nco_version}\n"
-if [ "${map_usr_flg}" = 'Yes' ] && [ -n "${wgt_usr}" ] ; then
-    printf "${spt_nm}: ERROR Specifying both '-m map_fl' and '-w wgt_gnr' is not allowed (weight-generator is unnecessary)\n"
+if [ "${map_mk}" != 'Yes' ] && [ "${map_usr_flg}" = 'Yes' ] && [ -n "${wgt_usr}" ] ; then
+    printf "${spt_nm}: ERROR Specifying both '-m map_fl' and '-w wgt_gnr' is only allowed when creating a map (weight generator is superfluous when map is supplied)\n"
     exit 1
 fi # wgt_usr
-if [ "${grd_src_usr_flg}" = 'Yes' ]; then
-    if [ "${map_usr_flg}" = 'Yes' ]; then 
-	printf "${spt_nm}: ERROR Specifying both '-s grd_src' and '-m map_fl' is ambiguous and forbidden\n"
-	exit 1
-    fi # !map_usr_flg
-fi # !grd_src_usr_flg
     
 if [ "${dst_usr_flg}" = 'Yes' ]; then 
-    if [ "${map_usr_flg}" = 'Yes' ]; then 
-	printf "${spt_nm}: ERROR Specify either '-d dst_fl' or '-m map_fl' not both\n"
-	exit 1
-    fi # !map_usr_flg
     if [ "${grd_dst_usr_flg}" = 'Yes' ]; then 
 	printf "${spt_nm}: ERROR Specify either '-d dst_fl' or '-g grd_dst' not both\n"
 	exit 1
     fi # !grd_dst_usr_flg
-else # !dst_usr_flg
-    if [ "${grd_dst_usr_flg}" = 'Yes' ]; then 
-	if [ "${map_usr_flg}" = 'Yes' ]; then 
-	    printf "${spt_nm}: ERROR Specify either '-g grd_dst' or '-m map_fl' not both\n"
-	    exit 1
-	fi # !map_usr_flg
-    else
-	if [ "${map_usr_flg}" != 'Yes' ] && [ "${grd_sng_usr_flg}" != 'Yes' ] ; then 
-	    printf "${spt_nm}: ERROR Must use one of '-d dst_fl', '-g grd_dst', '-G grd_sng', or '-m map_fl'\n"
-	    exit 1
-	fi # !map_usr_flg
-    fi # !grd_dst_usr_flg
+fi # !dst_usr_flg
+if [ "${dst_usr_flg}" != 'Yes' ] && [ "${grd_dst_usr_flg}" != 'Yes' ] && [ "${map_usr_flg}" != 'Yes' ] && [ "${grd_sng_usr_flg}" != 'Yes' ] ; then 
+    printf "${spt_nm}: ERROR Must use one of '-d dst_fl', '-g grd_dst', '-G grd_sng', or '-m map_fl'\n"
+    exit 1
 fi # !dst_usr_flg
 
 # Generate destination grid, if necessary, once (only) before loop over input files
 # Block 1: Destination grid
-# Unlike source grid, same destination grid is used for all files
-# Generate destination grid at most one-time
+# Generate destination grid at most one-time (unlike source grid)
 # Eventually we will allow destination grid to be provided as grid-file, map-file, or data-file
 # Currently we require user to know (and specify) means by which destination grid is provided
 if [ -n "${pdq_opt}" ]; then 
     printf "Input data obey \"${pdq_typ}\"-ordering and will be permuted with \"ncpdq ${pdq_opt}\"\n"
 fi # !pdq_opt
-if [ "${map_usr_flg}" = 'Yes' ]; then 
+if [ "${map_mk}" != 'Yes' ] && [ "${map_usr_flg}" = 'Yes' ]; then 
     printf "Source and destination grids will both be read from supplied map-file\n"
 else # !map_usr_flg
     fl_idx=0 # [idx] Current file index
@@ -662,14 +673,12 @@ if [ "${grd_src_usr_flg}" = 'Yes' ]; then
     if [ "${wgt_gnr}" = 'tempest' ]; then 
 	cmd_msh[${fl_idx}]="GenerateOverlapMesh --a ${grd_src} --b ${grd_dst} --out ${msh_fl} > /dev/null"
 	cmd_map[${fl_idx}]="GenerateOfflineMap --in_mesh ${grd_src} --out_mesh ${grd_dst} --ov_mesh ${msh_fl} --out_map ${map_fl} ${tps_opt} > /dev/null"
-	# 20160101: TempestRemap programs have false positive error returns (failures reported as successes) so remove old map/mesh before generating new
-	/bin/rm -f ${msh_fl} ${map_fl}
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_msh[${fl_idx}]}
 	fi # !dbg
 	if [ ${dbg_lvl} -ne 2 ]; then
 	    eval ${cmd_msh[${fl_idx}]}
-	    if [ $? -ne 0 ] || [ ! -f ${msh_fl} ] ; then
+	    if [ $? -ne 0 ] || [ ! -f ${msh_fl} ]; then
 		printf "${spt_nm}: ERROR Failed to generate mesh-file. Debug this:\n${cmd_msh[${fl_idx}]}\n"
 		exit 1
 	    fi # !err
@@ -680,7 +689,7 @@ if [ "${grd_src_usr_flg}" = 'Yes' ]; then
     fi # !dbg
     if [ ${dbg_lvl} -ne 2 ]; then
 	eval ${cmd_map[${fl_idx}]}
-	if [ $? -ne 0 ] || [ ! -f ${map_fl} ] ; then
+	if [ $? -ne 0 ] || [ ! -f ${map_fl} ]; then
 	    printf "${spt_nm}: ERROR Failed to generate map-file. Debug this:\n${cmd_map[${fl_idx}]}\n"
 	    if [ "${wgt_gnr}" = 'esmf' ]; then 
 		printf "${spt_nm}: HINT When ESMF fails to generate map-files, it often puts additional debugging information in the file named PET0.RegridWeightGen.Log in the invocation directory (${drc_pwd})\n"
@@ -688,8 +697,8 @@ if [ "${grd_src_usr_flg}" = 'Yes' ]; then
 	    exit 1
 	fi # !err
     fi # !dbg
-    # Set map_usr_flg to 'Yes' here to avoid re-generating map within file loop
-    map_usr_flg='Yes'
+    # Set map_mk to something besides 'Yes' to avoid re-generating map within file loop
+    map_mk='Already made map once. Never again.'
 fi # !grd_src_usr_flg
 
 # Begin loop over input files
@@ -720,8 +729,8 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	exit 1
     fi # !basename
 
-    # Generate new map unless map-file was supplied or already-generated (as indicated by map_usr_flg)
-    if [ "${map_usr_flg}" != 'Yes' ]; then
+    # Generate new map unless map-file was supplied or already-generated
+    if [ "${map_mk}" = 'Yes' ]; then
 	# Block 2: Source grid
 	# Block 2 Loop 1: Source gridfile command
 	if [ ! -e "${in_fl}" ]; then
@@ -753,10 +762,8 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	fi # !esmf
 	if [ "${wgt_gnr}" = 'tempest' ]; then 
 	    printf "Mesh-File: ${msh_fl}\n"
-	    cmd_msh[${fl_idx}]="GenerateOverlapMesh --a ${grd_src} --b ${grd_dst} --out ${msh_fl} ${tps_opt} > /dev/null"
+	    cmd_msh[${fl_idx}]="GenerateOverlapMesh --a ${grd_src} --b ${grd_dst} --out ${msh_fl} > /dev/null"
 	    cmd_map[${fl_idx}]="GenerateOfflineMap --in_mesh ${grd_src} --out_mesh ${grd_dst} --ov_mesh ${msh_fl} --out_map ${map_fl} ${tps_opt} > /dev/null"
-	    # 20160101: TempestRemap programs have false negative error returns (failures reported as successes) so remove old map/mesh before generating new
-	    /bin/rm -f ${msh_fl} ${map_fl}
 	    if [ ${dbg_lvl} -ge 1 ]; then
 		echo ${cmd_msh[${fl_idx}]}
 	    fi # !dbg
@@ -786,13 +793,32 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 
 	# Prevent creating new source gridfile and map-file after first iteration
 	if [ "${mlt_map_flg}" = 'No' ] && [ ${fl_idx} -eq 0 ] ; then 
-	    map_usr_flg='Yes'
+	    map_mk='Already made map once. Never again.'
 	fi # !mlt_map_flg
 
-    fi # !map_usr_flg
+    fi # !map_mk
     
-    # Block 4: Permutation
-    if [ -n "${pdq_opt}" ]; then # !pdq_opt
+    # Block 4: Special Cases
+    # Block 4a: HIRDLS
+    if [ "${pdq_typ}" = 'hirdls' ]; then
+	cmd_hirdls[${fl_idx}]="ncecat -u lon ${nco_opt} ${nco_var_lst} ${in_fl} ${in_fl} ${hirdls_fl}1;ncap2 ${nco_opt} -s 'lon[$lon]'={0.0,90.0,180.0,270.0}' ${hirdls_fl}1 ${hirdls_fl}2;ncpdq ${nco_opt} ${nco_var_lst} ${hirdls_fl}2 ${hirdls_fl}3;"
+	in_fl="${hirdls_fl}3"
+
+	# Block 4a Loop 2: Execute and/or echo commands
+	if [ ${dbg_lvl} -ge 1 ]; then
+	    echo ${cmd_hirdls[${fl_idx}]}
+	fi # !dbg
+	if [ ${dbg_lvl} -ne 2 ]; then
+	    eval ${cmd_hirdls[${fl_idx}]}
+	    if [ $? -ne 0 ] || [ ! -f "${hirdls_fl}3" ] ; then
+		printf "${spt_nm}: ERROR Failed to generate HIRDLS-file. Debug this:\n${cmd_hirdls[${fl_idx}]}\n"
+		exit 1
+	    fi # !err
+	fi # !dbg
+    fi # !hirdls
+
+    # Block 4: Generic Permutation (AIRS, MPAS)
+    if [ -n "${pdq_opt}" ]; then
 	printf "PDQ(in)  : ${in_fl}\n"
 	printf "PDQ(out) : ${pdq_fl}\n"
 	cmd_pdq[${fl_idx}]="ncpdq ${nco_opt} ${nco_var_lst} ${pdq_opt} ${in_fl} ${pdq_fl}"
@@ -834,6 +860,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	fi # !par_typ
     fi # !dbg
 
+    # Block 6: Wait
     # Parallel regridding (both Background and MPI) spawn simultaneous processes in batches of ${job_nbr}
     # Once ${job_nbr} jobs are running, wait() for all to finish before issuing another batch
     if [ -n "${par_opt}" ]; then
@@ -856,6 +883,22 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	fi # !bch_flg
     fi # !par_typ
     
+    # Block 7: HIRDLS special case
+    if [ "${pdq_typ}" = 'hirdls' ]; then
+	cmd_hirdls[${fl_idx}]="ncwa -a lon ${nco_opt} ${nco_var_lst} ${out_fl} ${out_fl}"
+	# Block 7 Loop 2: Execute and/or echo commands
+	if [ ${dbg_lvl} -ge 1 ]; then
+	    echo ${cmd_hirdls[${fl_idx}]}
+	fi # !dbg
+	if [ ${dbg_lvl} -ne 2 ]; then
+	    eval ${cmd_hirdls[${fl_idx}]}
+	    if [ $? -ne 0 ] || [ ! -f "${out_fl}" ] ; then
+		printf "${spt_nm}: ERROR Failed to generate HIRDLS-file. Debug this:\n${cmd_hirdls[${fl_idx}]}\n"
+		exit 1
+	    fi # !err
+	fi # !dbg
+    fi # !hirdls
+
 done # !fl_idx
 
 # Parallel mode will often exit loop after a partial batch, wait() for remaining jobs to finish
