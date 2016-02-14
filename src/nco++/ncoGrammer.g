@@ -2296,12 +2296,25 @@ out returns [var_sct *var]
     | (#(PLUS_ASSIGN  #(UTIMES VAR_ID) var2=out)) => #(PLUS_ASSIGN  #(UTIMES var1=out)  var2=out)  {
        var=ncap_var_var_inc(var1,var2, PLUS_ASSIGN ,true, prs_arg);
        }
+
+    | (#(PLUS_ASSIGN  #(UTIMES ATT_ID) var2=out)) => #(PLUS_ASSIGN  #(UTIMES atp:ATT_ID)  var2=out)  {
+
+       var1=out(att2var(atp));     
+       var=ncap_var_var_inc(var1,var2, PLUS_ASSIGN ,false, prs_arg);
+       }
+
+
     | ( #(MINUS_ASSIGN  (VAR_ID|ATT_ID)  var2=out)) => #(MINUS_ASSIGN  var1=out  var2=out)  {
        var=ncap_var_var_inc(var1,var2, MINUS_ASSIGN ,false, prs_arg);
        }
 
     | (#(MINUS_ASSIGN #(UTIMES VAR_ID) var2=out)) => #(MINUS_ASSIGN #(UTIMES var1=out)  var2=out)  {
        var=ncap_var_var_inc(var1,var2, MINUS_ASSIGN ,true, prs_arg);
+       }
+
+    | (#(MINUS_ASSIGN #(UTIMES ATT_ID) var2=out)) => #(MINUS_ASSIGN #(UTIMES atm:ATT_ID)  var2=out)  {
+       var1=out(att2var(atm));     
+       var=ncap_var_var_inc(var1,var2, MINUS_ASSIGN ,false, prs_arg);
        }
 
     | (#(TIMES_ASSIGN  (VAR_ID|ATT_ID)  var2=out)) => #(TIMES_ASSIGN  var1=out  var2=out)  {
@@ -2312,6 +2325,11 @@ out returns [var_sct *var]
        var=ncap_var_var_inc(var1,var2, TIMES_ASSIGN ,true, prs_arg);
        }
 
+    | (#(TIMES_ASSIGN #(UTIMES ATT_ID) var2=out)) => #(TIMES_ASSIGN #(UTIMES attm:ATT_ID)  var2=out)  {
+       var1=out(att2var(attm));     
+       var=ncap_var_var_inc(var1,var2, TIMES_ASSIGN ,false, prs_arg);
+       }
+
     | (#(DIVIDE_ASSIGN  (VAR_ID|ATT_ID)  var2=out)) => #(DIVIDE_ASSIGN  var1=out  var2=out)  {
        var=ncap_var_var_inc(var1,var2, DIVIDE_ASSIGN ,false, prs_arg);
        }
@@ -2319,40 +2337,93 @@ out returns [var_sct *var]
     | (#(DIVIDE_ASSIGN #(UTIMES VAR_ID) var2=out)) => #(DIVIDE_ASSIGN #(UTIMES var1=out)  var2=out)  {
        var=ncap_var_var_inc(var1,var2, DIVIDE_ASSIGN ,true, prs_arg);
        }
+
+    | (#(DIVIDE_ASSIGN #(UTIMES ATT_ID) var2=out)) => #(DIVIDE_ASSIGN #(UTIMES atd:ATT_ID)  var2=out)  {
+       var1=out(att2var(atd));        
+       var=ncap_var_var_inc(var1,var2, DIVIDE_ASSIGN ,false, prs_arg);
+       }
+
+
     | (#(ASSIGN (VAR_ID|ATT_ID))) => #(ASSIGN asn:.) {
              if(prs_arg->ntl_scn)
                var=assign_ntl(asn,false); 
              else
                var=assign(asn,false);
       }
-    | #(ASSIGN #(asn2:UTIMES VAR_ID) ) {
+    | #(UTIMES attz:ATT_ID) {
+
+          var=out(att2var(attz));    
+
+    }
+
+
+    /*
+    | (#(ASSIGN #(UTIMES ATT_ID) )) =>  #(ASSIGN #(atta:UTIMES ATT_ID))  {
               // Check for RAM variable - if present 
               // change tree - for example from:
               //     ( EXPR ( = ( * n1 ) ( + four four ) ) )
               // to  ( EXPR ( = n1 ( + four four ) ) )
              RefAST tr;
              NcapVar *Nvar;
+             att2var(atta->getFirstChild());     
+             tr=atta->getFirstChild();
+             tr->setNextSibling(atta->getNextSibling());
+             
+
+             if(prs_arg->ntl_scn)
+               var=assign_ntl(tr,false); 
+             else
+               var=assign(tr,false);
+               
+    }  
+   */
+
+
+    | #(ASSIGN #(asn2:UTIMES (VAR_ID|ATT_ID) )) {
+              // Check for RAM variable - if present 
+              // change tree - for example from:
+              //     ( EXPR ( = ( * n1 ) ( + four four ) ) )
+              // to  ( EXPR ( = n1 ( + four four ) ) )
+
+             bool bram; 
+             RefAST tr;
+             NcapVar *Nvar;          
 
              tr=asn2->getFirstChild();
              tr->setNextSibling(asn2->getNextSibling());
              
-             // Die if attempting to create a RAM var 
-             // from an existing disk var   
-             Nvar= prs_arg->var_vtr.find(tr->getText());
+             wrn_prn(fnc_nm, "out(ASSIGN):type="+nbr2sng((int)tr->getType()));  
+ 
+             if(tr->getType()==ATT_ID)  
+             { 
+               att2var(tr);   
+               bram=false;
 
-             if(Nvar && Nvar->flg_mem==false)
-             {
-              std::string serr;
-              serr= "It is impossible to recast disk variable: \"" + tr->getText() +"\" as a RAM variable.";
-              err_prn(fnc_nm,serr );       
-             }                
+             } 
+             // must be VAR_ID 
+             else 
+             { 
+                bram=true;   
+                // Die if attempting to create a RAM var 
+                // from an existing disk var   
+                Nvar= prs_arg->var_vtr.find(tr->getText());
+
+                if(Nvar && Nvar->flg_mem==false)
+                {
+                  std::string serr;
+                  serr= "It is impossible to recast disk variable: \"" + tr->getText() +"\" as a RAM variable.";
+                  err_prn(fnc_nm,serr );       
+                
+                }                
+             }
 
              if(prs_arg->ntl_scn)
-               var=assign_ntl(tr,true); 
+               var=assign_ntl(tr,bram); 
              else
-               var=assign(tr,true);
+               var=assign(tr,bram);
                
-            }  
+    }
+
      | #(WHERE_ASSIGN wasn:. ) {
 
      }
@@ -2701,6 +2772,48 @@ out returns [var_sct *var]
 // #endif /* !ENABLE_NETCDF4 */
 
 ;
+
+// takes an ATT_ID pointer and converts it to a VAR_ID
+att2var returns [ RefAST tr ]
+{
+  var_sct *var_att=NULL_CEWI; 
+  std::string sn;
+  NcapVar *Nvar;
+}
+
+: (att:ATT_ID) {
+
+      Nvar=prs_arg->var_vtr.find(att->getText());  
+
+    if(!Nvar)
+        err_prn("Unable to evaluate the attribute "  + att->getText() +" as a variable points\n Hint: The attribute should be defined in a previous scope" );
+    
+    var_att=nco_var_dpl(Nvar->var);
+    
+    if(var_att->type !=NC_STRING && var_att->type !=NC_CHAR )
+        err_prn("To use that attribute "+ att->getText() +" as a variable pointer it must be a text type  NC_CHAR or NC_STRING"); 
+    
+    cast_void_nctype(var_att->type, &var_att->val );
+    if(var_att->type == NC_STRING)
+    {
+       sn=var_att->val.sngp[0];
+    }
+    else if( var_att->type==NC_CHAR)
+    {        
+       char buffer[100]={'\0'};
+       strncpy(buffer, var_att->val.cp, var_att->sz);
+       sn=buffer;  
+    } 
+
+    cast_nctype_void(var_att->type, &var_att->val);
+    nco_var_free(var_att);  
+
+    tr->setType(VAR_ID);       
+    tr->setText(sn);
+
+    }
+;
+
 // Return a var or att WITHOUT applying a cast 
 // and checks that the operand is a valid Lvalue
 // ie that the var or att has NO children!!
