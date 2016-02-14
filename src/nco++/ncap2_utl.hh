@@ -372,6 +372,15 @@ var_sct *
 ncap_sclr_var_mk(
 const std::string var_nm,
 nco_uint64 val_uint64);
+
+
+
+var_sct *
+ncap_sclr_var_mk(
+const std::string var_nm,
+nco_string val_string);
+
+
 // end ncap_sclr_var_mk() overloads
 
 void

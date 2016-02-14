@@ -2478,7 +2478,7 @@ ncap_sclr_var_mk
   return var;
 }
 
-/* fxm: Allow ncap2 to instantiate NC_STRINGs
+/* fxm: Allow ncap2 to instantiate NC_STRINGs */
    var_sct *
    ncap_sclr_var_mk(
    const std::string var_nm,
@@ -2490,7 +2490,7 @@ ncap_sclr_var_mk
    *var->val.sngp=val_string;
    (void)cast_nctype_void((nc_type)NC_STRING,&var->val);
    return var;
-   } */ 
+   } 
 
 // Do an in-memory hyperslab !!
 void 

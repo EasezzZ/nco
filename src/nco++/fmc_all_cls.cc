@@ -3380,8 +3380,27 @@ double bil_cls::clc_lin_ipl(double x1,double x2, double x, double Q0,double Q1){
   if(nbr_args!=2)
     err_prn(sfnm, " Function has been called with wrong number of arguments arguments\n"+susg); 
 
-  // get var to push
-  var_add=walker.out(vtr_args[1]);
+  // get var to push -maybe a call by ref
+  if(vtr_args[1]->getType() == CALL_REF )     
+  {
+    nco_string val_string;
+    std::string add_nm=vtr_args[1]->getFirstChild()->getText();      
+
+    var_add=ncap_sclr_var_mk(SCS("var_add"), NC_STRING,false ); 
+
+    // malloc space directly if final scan
+    if(prs_arg->ntl_scn)
+    {   
+       var_add->val.vp=(void*)nco_malloc(nco_typ_lng(NC_STRING));
+       cast_void_nctype(NC_STRING, &var_add->val);        
+       var_add->val.sngp[0]=strdup(add_nm.c_str());   
+       cast_nctype_void(NC_STRING, &var_add->val);        
+    }
+      
+
+  }
+  else 
+   var_add=walker.out(vtr_args[1]);
              
 
 

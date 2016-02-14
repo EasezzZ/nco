@@ -1078,7 +1078,7 @@ RefAST nco_dupList(RefAST tr){
       RefAST otr;  
       // nb astFactory is protected- must call from within class
       otr=astFactory->dupList(tr);      
-      otr->setNextSibling( ANTLR_USE_NAMESPACE(antlr)nullAST ) ;
+      //otr->setNextSibling( ANTLR_USE_NAMESPACE(antlr)nullAST ) ;
       /*  
       if(otr->getNextSibling()!= ANTLR_USE_NAMESPACE(antlr)ASTNULL )     
         err_prn("nco_dupList", "NON NULL AST SIBLING\n");
@@ -2350,25 +2350,19 @@ out returns [var_sct *var]
              else
                var=assign(asn,false);
       }
-    | #(UTIMES attz:ATT_ID) {
 
-          var=out(att2var(attz));    
-
-    }
-
-
-    /*
     | (#(ASSIGN #(UTIMES ATT_ID) )) =>  #(ASSIGN #(atta:UTIMES ATT_ID))  {
               // Check for RAM variable - if present 
               // change tree - for example from:
               //     ( EXPR ( = ( * n1 ) ( + four four ) ) )
               // to  ( EXPR ( = n1 ( + four four ) ) )
              RefAST tr;
-             NcapVar *Nvar;
-             att2var(atta->getFirstChild());     
+
              tr=atta->getFirstChild();
              tr->setNextSibling(atta->getNextSibling());
              
+             // remember tr siblings and children are  duplicated here   
+             tr=att2var(tr);   
 
              if(prs_arg->ntl_scn)
                var=assign_ntl(tr,false); 
@@ -2376,36 +2370,34 @@ out returns [var_sct *var]
                var=assign(tr,false);
                
     }  
-   */
-
-
-    | #(ASSIGN #(asn2:UTIMES (VAR_ID|ATT_ID) )) {
+    
+    //  memory var - regular and pointer
+    | #(ASSIGN #(asn2:UTIMES (VAR_ID| #(UTIMES  asn2a:ATT_ID)) )) {
               // Check for RAM variable - if present 
               // change tree - for example from:
               //     ( EXPR ( = ( * n1 ) ( + four four ) ) )
               // to  ( EXPR ( = n1 ( + four four ) ) )
 
-             bool bram; 
              RefAST tr;
              NcapVar *Nvar;          
 
-             tr=asn2->getFirstChild();
-             tr->setNextSibling(asn2->getNextSibling());
-             
-             wrn_prn(fnc_nm, "out(ASSIGN):type="+nbr2sng((int)tr->getType()));  
- 
-             if(tr->getType()==ATT_ID)  
+             // deal with ATT_ID 
+             if(asn2a)  
              { 
-               att2var(tr);   
-               bram=false;
+               // remember tr and siblings and children are  duplicated here
+               tr=att2var(asn2a);   
+               tr->setNextSibling(asn2->getNextSibling());
 
              } 
              // must be VAR_ID 
              else 
              { 
-                bram=true;   
-                // Die if attempting to create a RAM var 
-                // from an existing disk var   
+                  
+               tr=asn2->getFirstChild();
+               tr->setNextSibling(asn2->getNextSibling());
+
+               // Die if attempting to create a RAM var 
+               // from an existing disk var   
                 Nvar= prs_arg->var_vtr.find(tr->getText());
 
                 if(Nvar && Nvar->flg_mem==false)
@@ -2418,11 +2410,19 @@ out returns [var_sct *var]
              }
 
              if(prs_arg->ntl_scn)
-               var=assign_ntl(tr,bram); 
+               var=assign_ntl(tr,true); 
              else
-               var=assign(tr,bram);
+               var=assign(tr, true);
                
+        }
+   
+
+
+    | #(UTIMES attz:ATT_ID) {
+          var=out(att2var(attz));    
     }
+
+
 
      | #(WHERE_ASSIGN wasn:. ) {
 
@@ -2808,6 +2808,11 @@ att2var returns [ RefAST tr ]
     cast_nctype_void(var_att->type, &var_att->val);
     nco_var_free(var_att);  
 
+    // tr->setType(VAR_ID);       
+    //tr->setText(sn);
+    //tr=att->clone();
+    tr=nco_dupList(att);
+      
     tr->setType(VAR_ID);       
     tr->setText(sn);
 
