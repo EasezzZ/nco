@@ -72,6 +72,7 @@ nco_opr_nrm /* [fnc] Normalization of arithmetic operations for ncra/nces */
     }else{ /* !var_prc[idx]->is_crd_var */
       switch(nco_op_typ_cpy){
       case nco_op_avg: /* Normalize sum by tally to create mean */
+      case nco_op_mebs: /* Normalize sum by tally to create mean */
       case nco_op_sqrt: /* Normalize sum by tally to create mean */
       case nco_op_sqravg: /* Normalize sum by tally to create mean */
       case nco_op_rms: /* Normalize sum of squares by tally to create mean square */
@@ -83,15 +84,17 @@ nco_opr_nrm /* [fnc] Normalization of arithmetic operations for ncra/nces */
         break;
       case nco_op_min: /* Minimum is already in buffer, do nothing */
       case nco_op_max: /* Maximum is already in buffer, do nothing */
+      case nco_op_mibs: /* Minimum absolute value is already in buffer, do nothing */
       case nco_op_mabs: /* Maximum absolute value is already in buffer, do nothing */
         break;
       case nco_op_ttl: /* Total is already in buffer, stuff missing values into elements with zero tally */
         (void)nco_var_tll_zro_mss_val(var_prc_out[idx]->type,var_prc_out[idx]->sz,var_prc[idx]->has_mss_val,var_prc_out[idx]->mss_val,var_prc[idx]->tally,var_prc_out[idx]->val);
         break;
       default:
+	nco_dfl_case_generic_err();
         break;
       } /* end switch */
-      /* Some operations require additional processing */
+      /* A few operations require additional processing */
       switch(nco_op_typ_cpy) {
       case nco_op_rms: /* Take root of mean of sum of squares to create root mean square */
       case nco_op_rmssdn: /* Take root of sdn mean of sum of squares to create root mean square for sdn */
@@ -101,7 +104,17 @@ nco_opr_nrm /* [fnc] Normalization of arithmetic operations for ncra/nces */
       case nco_op_sqravg: /* Square mean to create square of the mean (for sdn) */
         (void)nco_var_mlt(var_prc_out[idx]->type,var_prc_out[idx]->sz,var_prc_out[idx]->has_mss_val,var_prc_out[idx]->mss_val,var_prc_out[idx]->val,var_prc_out[idx]->val);
         break;
+      case nco_op_avg:
+      case nco_op_ttl:
+      case nco_op_min:
+      case nco_op_max:
+      case nco_op_mibs:
+      case nco_op_mabs:
+      case nco_op_mebs:
+      case nco_op_avgsqr:
+        break;
       default:
+	nco_dfl_case_generic_err();
         break;
       } /* end switch */
     } /* !var_prc[idx]->is_crd_var */
@@ -158,10 +171,8 @@ nco_opr_drv /* [fnc] Intermediate control of arithmetic operations for ncra/nces
     break;	
   case nco_op_mebs: /* Mean absolute value */
     /* Always take the absolute value of the fresh input
-       Then, on first loop, copy variable from var_prc to var_prc_out like min and max
-       Following loops, do comparative maximum after taking absolute value */
+       Every loop add and increment tally like avg, sqrt, sqravg */
     (void)nco_var_abs(var_prc->type,var_prc->sz,var_prc->has_mss_val,var_prc->mss_val,var_prc->val);
-    if(idx_rec == 0) (void)nco_var_copy(var_prc->type,var_prc->sz,var_prc->val,var_prc_out->val); 
     (void)nco_var_add_tll_ncra(var_prc->type,var_prc->sz,var_prc->has_mss_val,var_prc->mss_val,var_prc->tally,var_prc->wgt_crr,var_prc->wgt_sum,var_prc->val,var_prc_out->val);
     break;	
   case nco_op_mibs: /* Mean absolute value */
@@ -199,6 +210,9 @@ nco_opr_drv /* [fnc] Intermediate control of arithmetic operations for ncra/nces
     /* Sum the squares */
     (void)nco_var_add_tll_ncra(var_prc_out->type,var_prc_out->sz,var_prc->has_mss_val,var_prc->mss_val,var_prc->tally,var_prc->wgt_crr,var_prc->wgt_sum,var_prc->val,var_prc_out->val);
     break;
+  default:
+    nco_dfl_case_generic_err();
+    break; /* [enm] Nil or undefined operation type */
   } /* end switch */
 } /* end nco_opr_drv() */
 
@@ -227,7 +241,8 @@ nco_op_typ_cf_sng /* [fnc] Convert arithmetic operation type enum to string */
   case nco_op_dvd:
   case nco_op_nil:
   default:
-    return "BROKEN";
+    nco_dfl_case_generic_err();
+    return "BROKEN"; /* CEWI */
     break; /* [enm] Nil or undefined operation type */
   } /* end switch */
 } /* end nco_op_typ_cf_sng() */
