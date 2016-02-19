@@ -1182,6 +1182,28 @@ print "\n";
     NCO_bm::tst_run(\@tst_cmd);
     $#tst_cmd=0; # Reset array	
 
+#nces #24
+# nces -O -y tabs -v one -p ~/nco/data in.nc in.nc ~/foo.nc
+# ncks -C -H -v one ~/foo.nc
+    $dsc_sng="Test tabs (total absolute value)";
+    $tst_cmd[0]="ncra -Y ncfe -y tabs -v one $omp_flg -O $fl_fmt $nco_D_flg $in_pth_arg in.nc in.nc %tmp_fl_00%";
+    $tst_cmd[1]="ncks -C -H -v one %tmp_fl_00%";
+    $tst_cmd[2]="one = 2";
+    $tst_cmd[3]="SS_OK";
+    NCO_bm::tst_run(\@tst_cmd);
+    $#tst_cmd=0; # Reset array	
+
+#nces #25
+# nces -O -y tabs -v lond -p ~/nco/data in.nc in.nc ~/foo.nc
+# ncks -C -H -v lon -d lon,3 ~/foo.nc
+    $dsc_sng="Test tabs on coordinate";
+    $tst_cmd[0]="ncra -Y ncfe -y tabs -v lond $omp_flg -O $fl_fmt $nco_D_flg $in_pth_arg in.nc in.nc %tmp_fl_00%";
+    $tst_cmd[1]="ncks -C -H -v lon -d lon,3 %tmp_fl_00%";
+    $tst_cmd[2]="lon[3] = 270";
+    $tst_cmd[3]="SS_OK";
+    NCO_bm::tst_run(\@tst_cmd);
+    $#tst_cmd=0; # Reset array	
+
 # print "paused - hit return to continue"; my $wait=<STDIN>;
     
 ####################
@@ -2738,7 +2760,7 @@ if($RUN_NETCDF4_TESTS_VERSION_GE_431){
 
 } # RUN_NETCDF4_TESTS_VERSION_GE_431
 	
-#ncks #112 wrapped limit with an additional limit (no --msa)
+# ncks #112 wrapped limit with an additional limit (no --msa)
 # ncks -O -C -g g19 -v time -d time,9,0 -d time,1,2 ~/nco/data/in_grp_3.nc ~/foo.nc
     $dsc_sng="(Groups) Test wrapped limit with addtional limit (no --msa)";
     $tst_cmd[0]="ncks -O $nco_D_flg -C -g g19 -v time -d time,9,0 -d time,1,2 $in_pth_arg in_grp_3.nc %tmp_fl_00";
@@ -2750,14 +2772,13 @@ if($RUN_NETCDF4_TESTS_VERSION_GE_431){
 	
 #ncks #113 wrapped limit with an additional limit (with --msa) pvn20160211 -- bug found that happens in nco 4.2.0 also
 # ncks -O -C --msa -g g19 -v time -d time,9,0 -d time,1,2 ~/nco/data/in_grp_3.nc ~/foo.nc
-    $dsc_sng="EXPECTED FAILURE(Groups) Test wrapped limit with additonal limit and msa user order";
+    $dsc_sng="(Groups) Test wrapped limit with additonal limit and msa user order (expect failure TODO)";
     $tst_cmd[0]="ncks -O $nco_D_flg -C --msa -g g19 -v time -d time,9,0 -d time,1,2 $in_pth_arg in_grp_3.nc %tmp_fl_00";
     $tst_cmd[1]="ncks -H %tmp_fl_00 | grep '=3'";
     $tst_cmd[2]="time[3]=3"; 
     $tst_cmd[3]="SS_OK";
     NCO_bm::tst_run(\@tst_cmd);
     $#tst_cmd=0; # Reset array	
-	
 	
 #####################
 #### ncpdq tests #### -OK !
@@ -3295,7 +3316,7 @@ if($RUN_NETCDF4_TESTS_VERSION_GE_431){
 
 #ncpdq #41
 #ncpdq -O -a -lat -g g23,g24 ~/nco/data/in_grp_3.nc ~/foo.nc
-   $dsc_sng="(Groups) Reverse -a lat -g g24 several groups";
+   $dsc_sng="(Groups) Reverse -a lat -g g24 several groups (expect failure TODO)";
    $tst_cmd[0]="ncpdq $omp_flg $fl_fmt $nco_D_flg -O -a -lat -g g23,g24 $in_pth_arg in_grp_3.nc %tmp_fl_00%";
    $tst_cmd[1]="ncks -v lat -g g24 %tmp_fl_00%";
    $tst_cmd[2]="lat[1]=-60 degrees_north";
@@ -5006,6 +5027,39 @@ if(0){
     $tst_cmd[3]="SS_OK";
     NCO_bm::tst_run(\@tst_cmd);
     $#tst_cmd=0; # Reset array
+
+#ncwa #67
+# ncwa -O -y mebs -v one_dmn_rec_var_flt -p ~/nco/data in.nc in.nc ~/foo.nc
+# ncks -C -H -v one_dmn_rec_var_flt ~/foo.nc
+    $dsc_sng="Test mebs normalization";
+    $tst_cmd[0]="ncwa -y mebs -v one_dmn_rec_var_flt $omp_flg -O $fl_fmt $nco_D_flg $in_pth_arg in.nc %tmp_fl_00%";
+    $tst_cmd[1]="ncks -C -H -v one_dmn_rec_var_flt %tmp_fl_00%";
+    $tst_cmd[2]="one_dmn_rec_var_flt = 5.5";
+    $tst_cmd[3]="SS_OK";
+    NCO_bm::tst_run(\@tst_cmd);
+    $#tst_cmd=0; # Reset array	
+
+#ncwa #68
+# ncwa -O -y tabs -v one_dmn_rec_var -p ~/nco/data in.nc in.nc ~/foo.nc
+# ncks -C -H -v one_dmn_rec_var ~/foo.nc
+    $dsc_sng="Test tabs (total absolute value)";
+    $tst_cmd[0]="ncwa -y tabs -v one_dmn_rec_var $omp_flg -O $fl_fmt $nco_D_flg $in_pth_arg in.nc %tmp_fl_00%";
+    $tst_cmd[1]="ncks -C -H -v one_dmn_rec_var %tmp_fl_00%";
+    $tst_cmd[2]="one_dmn_rec_var = 55";
+    $tst_cmd[3]="SS_OK";
+    NCO_bm::tst_run(\@tst_cmd);
+    $#tst_cmd=0; # Reset array	
+
+#ncwa #69
+# ncwa -O -y tabs -v lon -p ~/nco/data in.nc in.nc ~/foo.nc
+# ncks -C -H -v lon ~/foo.nc
+    $dsc_sng="Test tabs on coordinate";
+    $tst_cmd[0]="ncwa -y tabs -v lon $omp_flg -O $fl_fmt $nco_D_flg $in_pth_arg in.nc %tmp_fl_00%";
+    $tst_cmd[1]="ncks -C -H -v lon %tmp_fl_00%";
+    $tst_cmd[2]="lon = 135";
+    $tst_cmd[3]="SS_OK";
+    NCO_bm::tst_run(\@tst_cmd);
+    $#tst_cmd=0; # Reset array	
 
 ####################
 #### ncrename tests #### OK!

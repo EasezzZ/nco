@@ -1,23 +1,28 @@
 $Header$ -*-text-*-
 
-The netCDF Operators NCO version 4.5.5-alpha07 are ready. 
+The netCDF Operators NCO version 4.5.5 are ready. 
 
 http://nco.sf.net (Homepage, Mailing lists)
 http://github.com/nco (Source Code, Releases, Developers)
 
-CDF5 is supported.
+What's new?
+NCO fully supports CDF5-format datasets, ncremap continues to
+accrue useful features, and some corner case bugs were fixed.
 
 Work on NCO 4.5.6 has commenced and will better support eliciting
 latitude/longitude coordinates using the CF "coordinates" convention
 and regridding variables whose horizontal dimensions are not the
-most-rapidly-varying, and ncremap support for calling TempestRemap.  
+most-rapidly-varying.
 
 Enjoy,
 Charlie
 
 NEW FEATURES (full details always in ChangeLog):
 
-A. NCO supports the CDF5 file type introduced in netCDF 4.4.0.
+A. NCO supports the CDF5 file type first introduced by pnetCDF and now  
+   supported in Unidata netCDF as of version 4.4.0.
+   CDF5 uses 64-bit offsets for a large address space (like the netCDF
+   64BIT type) AND arrays may have more than 2^32 elements.
    Use '-5', '--5', '--fl_fmt=[cdf5|64bit_data|pnetcdf]'.
    Conversion to and between all netCDF filetypes is supported:
    ncks -5 in_3.nc out_5.nc
@@ -36,14 +41,30 @@ B. ncremap: -P option triggers filetype-specific workflow procedures
    from the way NASA/MPAS distributes generates these datasets so 
    that horizontal spatial dimensions (lat, lon) come last.
    This is friendlier for regridding applications.
-   Also, -m map_fl supplies names to internally generated mapfiles: 
-   ncremap -i in.nc -d dst.nc -m map.nc -o out.nc
+
+C. ncremap: -m map_fl supplies names to generated mapfiles and ncremap 
+   annotates map-files it creates with full history. This helps retain
+   provenance in generated mapfiles. And ncremap has a friendlier
+   mode, "map-only" mode, to generate mapfiles for later use.
+   To use this mode, call ncremap without any input files to remap.  
+   ncremap will then generate the mapfile then exit.
+   ncremap -i in.nc -d dst.nc -m map.nc -o out.nc # Named mapfile
+   ncremap -s grd_in.nc -g grd_out.nc -m map.nc # Map-only mode
    http://nco.sf.net/nco.html#ncremap
 
-C. ncremap -j job_nbr option for MPI parallelism
+D. ncremap -j job_nbr option for MPI parallelism
    http://nco.sf.net/nco.html#ncremap
 
-D. Improve support for Cygwin builds
+E. ncra/nces/ncwa: New operation tabs()=total_absolute_value.
+   The the -y tabs option is like -y ttl except the sum is over
+   absolute values. tabs(), mibs(), mebs(), and mabs() are analogous
+   to ttl(), min(), mean(), and max(). 
+   nces -y tabs in.nc in.nc out.nc
+   ncra -y tabs in.nc in.nc out.nc
+   ncwa -y tabs in.nc out.nc
+   http://nco.sf.net/nco.html#op_typ
+
+F. Improve support for Cygwin builds
 
 BUG FIXES:
 
@@ -72,11 +93,15 @@ E. ncra/nces: Correctly normalize "mebs" arithmetic. Under certain
 F. ncap2: Fix incorrect handling of negative dimension indices.
    Problem reported by Maksym Petrenko.
 
+G. ncatted/ncrename: Fully support --glb_att_add=--gaa.
+   This corrects an earlier oversight.
+   http://nco.sf.net/nco.html#gaa
+
 KNOWN PROBLEMS DUE TO NCO:
 
    This section of ANNOUNCE reports and reminds users of the
    existence and severity of known, not yet fixed, problems. 
-   These problems occur with NCO 4.5.5-alpha07 built/tested under
+   These problems occur with NCO 4.5.5 built/tested under
    MacOS with netCDF 4.3.3.1 on HDF5 1.8.16 and with
    Linux with netCDF 4.4.1-development (20160212) on HDF5 1.8.13.
 

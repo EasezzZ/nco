@@ -322,14 +322,14 @@ extern "C" {
 # define NCO_VERSION_PATCH 5
 #endif /* !NCO_VERSION_PATCH */
 #ifndef NCO_VERSION_NOTE
-# define NCO_VERSION_NOTE  "alpha07" /* Blank for final versions, non-blank (e.g., "beta37") for pre-release versions */
+# define NCO_VERSION_NOTE  "" /* Blank for final versions, non-blank (e.g., "beta37") for pre-release versions */
 #endif /* !NCO_VERSION_NOTE */
 #ifndef NCO_LIB_VERSION
   /* Define NC_LIB_VERSION as three-digit number for arithmetic comparisons by CPP */
 # define NCO_LIB_VERSION ( NCO_VERSION_MAJOR * 100 + NCO_VERSION_MINOR * 10 + NCO_VERSION_PATCH )
 #endif /* !NCO_LIB_VERSION */
 #ifndef NCO_VERSION
-# define NCO_VERSION "4.5.5-alpha07"
+# define NCO_VERSION "4.5.5"
 #endif /* !NCO_VERSION */
 
 /* Compatibility tokens new to netCDF4 netcdf.h: */
@@ -642,6 +642,7 @@ extern "C" {
     nco_op_mabs, /* [enm] Maximum absolute value */
     nco_op_mebs, /* [enm] Mean absolute value */
     nco_op_mibs, /* [enm] Minimum absolute value */
+    nco_op_tabs, /* [enm] Total absolute value */
     nco_op_nil /* [enm] Nil or undefined operation type */
   }; /* end nco_op_typ enum */
 
@@ -1159,6 +1160,7 @@ extern "C" {
     /* Following are members only used by transformation operators (non-ncks) */
     nco_bool flg_dmn_avg;    /* [flg] Diferentiate between dimensions to average or keep for this variable (ncwa) */  
     nco_bool flg_rdd;        /* [flg] Retain dimension as degenerate (size 1) (ncwa) */  
+    nco_bool flg_rvr;        /* [flg] Reverse dimension (option -a - of ncpdq) FXM_PVN */
   } var_dmn_sct; 
 
   /* Processing type enumerator */

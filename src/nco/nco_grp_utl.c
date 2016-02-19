@@ -4620,14 +4620,22 @@ nco_cpy_var_dfn_trv                 /* [fnc] Define specified variable in output
   if(var_trv->flg_rdr){
     /* Must be ncpdq */
     assert(nco_prg_id == ncpdq);
-    for(int dmn_out_idx=0;dmn_out_idx<nbr_dmn_var;dmn_out_idx++)
-      dmn_idx_in_out[var_trv->dmn_idx_out_in[dmn_out_idx]]=dmn_out_idx;
+    for(int idx_dmn=0;idx_dmn<nbr_dmn_var;idx_dmn++)
+      dmn_idx_in_out[var_trv->dmn_idx_out_in[idx_dmn]]=idx_dmn;
 
-    for(int dmn_out_idx=0;dmn_out_idx<nbr_dmn_var;dmn_out_idx++)
-      dmn_out_id_tmp[dmn_out_idx]=dmn_out_id[dmn_out_idx];
+    for(int idx_dmn=0;idx_dmn<nbr_dmn_var;idx_dmn++)
+      dmn_out_id_tmp[idx_dmn]=dmn_out_id[idx_dmn];
 
-    for(int dmn_out_idx=0;dmn_out_idx<nbr_dmn_var;dmn_out_idx++)
-      dmn_out_id[dmn_idx_in_out[dmn_out_idx]]=dmn_out_id_tmp[dmn_out_idx];
+    for(int idx_dmn=0;idx_dmn<nbr_dmn_var;idx_dmn++)
+      dmn_out_id[dmn_idx_in_out[idx_dmn]]=dmn_out_id_tmp[idx_dmn];
+
+    if (nco_dbg_lvl_get() >= nco_dbg_dev){
+      (void)fprintf(stdout, "%s: DEBUG %s dimensions for %s:\n",nco_prg_nm_get(),fnc_nm,var_trv->nm_fll);
+      for (int idx_dmn=0; idx_dmn<nbr_dmn_var;idx_dmn++){
+        char *dmm_nm_fll=nco_get_dmn_nm_fll(dmn_out_id[idx_dmn],dmn_cmn,nbr_dmn_var);
+        (void)fprintf(stdout, "%s %d\n",dmm_nm_fll,dmn_cmn[idx_dmn].id);
+      }
+    }
   } /* !var_trv->rdr */
 
   if(nco_prg_id == ncecat && rec_dmn_nm && var_trv->enm_prc_typ == prc_typ){ 
@@ -4875,50 +4883,18 @@ nco_dfn_dmn                            /* [fnc] Define dimension size and ID in 
 
 } /* nco_dmn_dfn */
 
-void
-nco_dmn_rdr_trv                        /* [fnc] Transfer dimension structures to be re-ordered (ncpdq) into GTT */
-(int **dmn_idx_out_in,                 /* I [idx] Dimension correspondence, output->input, output of nco_var_dmn_rdr_mtd() */
- const int nbr_var_prc,                /* I [nbr] Size of above array (number of processed variables) */
- var_sct **var_prc_out,                /* I [sct] Processed variables */
- trv_tbl_sct * const trv_tbl)          /* I/O [sct] Traversal table */
+char *
+nco_get_dmn_nm_fll                     /* [fnc] Return dimension name with input id (debug) */
+(const int dmn_id,                     /* I [id] ID of dimension */
+ const dmn_cmn_sct * const dmn_cmn,    /* I [sct] Dimension structure array */
+ const int nbr_dmn)                    /* I [nbr] Number of dimensions (size of above array) */
 {
-  /* Purpose: Transfer dimension structures to be re-ordered (ncpdq) into GTT */
+  /* Loop dimensions */
+  for(int idx_dmn=0;idx_dmn<nbr_dmn;idx_dmn++)
+    if(dmn_id == dmn_cmn[idx_dmn].id) return dmn_cmn[idx_dmn].nm_fll;
 
-  assert(nco_prg_id_get() == ncpdq);
-
-  /* Loop processed variables */
-  for(int idx_var_prc=0;idx_var_prc<nbr_var_prc;idx_var_prc++){
-
-    /* Loop table */
-    for(unsigned idx_var=0;idx_var<trv_tbl->nbr;idx_var++){
-      trv_sct var_trv=trv_tbl->lst[idx_var];
-
-      /* If GTT variable object is to extract */
-      if(var_trv.nco_typ == nco_obj_typ_var && var_trv.flg_xtr){ 
-
-        /* Match by full variable name  */
-        if(!strcmp(var_prc_out[idx_var_prc]->nm_fll,var_trv.nm_fll)){
-
-          /* Mark re-order flag */
-          trv_tbl->lst[idx_var].flg_rdr=True;
-
-          assert(var_trv.nbr_dmn==var_prc_out[idx_var_prc]->nbr_dim);
-
-          /* Loop variable dimensions */
-          for(int idx_var_dmn=0;idx_var_dmn<var_trv.nbr_dmn;idx_var_dmn++){
-
-            /* Transfer */
-            trv_tbl->lst[idx_var].dmn_idx_out_in[idx_var_dmn]=dmn_idx_out_in[idx_var_prc][idx_var_dmn];
-
-          } /* Loop variable dimensions */
-        } /* Match by full variable name  */
-      } /* If GTT variable object is to extract */
-    } /* Loop table */
-  } /* Loop processed variables */
-
-  return;
-
-} /* end nco_dmn_rdr_trv() */
+  return "ERROR";
+} /* nco_get_dmn_nm_fll() */
 
 void
 nco_var_dmn_rdr_mtd_trv /* [fnc] Set new dimensionality in metadata of each re-ordered variable */
@@ -4981,6 +4957,17 @@ nco_var_dmn_rdr_mtd_trv /* [fnc] Set new dimensionality in metadata of each re-o
       rec_dmn_nm_in=(char *)strdup(rec_dmn_nm->lst[0].nm);
       rec_dmn_nm_out=(char *)strdup(rec_dmn_nm->lst[0].nm);
     } /* !rec_dmn_nm->lst */
+
+#ifdef FXM_PVN
+    nco_bool dmn_rvr_rdr_[NC_MAX_DIMS]; /* [flg] Reverse dimension */
+    /* Define a local dmn_rvr_rdr array upon reverse flag defined in dimensions for variable */
+    for(int idx_dmn=0;idx_dmn<var_trv->nbr_dmn;idx_dmn++){
+      dmn_rvr_rdr_[idx_dmn]=False;
+      if(var_trv->var_dmn[idx_dmn].flg_rvr == True){
+        dmn_rvr_rdr_[idx_dmn]=True;
+      }
+    }
+#endif
 
     /* nco_var_dmn_rdr_mtd() does re-order heavy lifting */
     rec_dmn_nm_out_crr=nco_var_dmn_rdr_mtd(var_prc[idx_var_prc],var_prc_out[idx_var_prc],dmn_rdr,dmn_rdr_nbr,dmn_idx_out_in,dmn_rvr_rdr,dmn_rvr_in);
@@ -5996,64 +5983,82 @@ nco_dmn_avg_mk                         /* [fnc] Build dimensions to average(ncwa
           /* Dimension name relative */
           char *dmn_nm=trv_obj.var_dmn[idx_var_dmn].dmn_nm;
 
+          char *sng_dmn=NULL;
+
+          trv_tbl->lst[idx_tbl].var_dmn[idx_var_dmn].flg_rvr=False;
+
+          /* Option -a '-' (minus), reverse dimesnion Strip-out '-' and compare name */
+          if (usr_sng[0] == '-'){
+            sng_dmn=(char *)strdup(usr_sng+1L);
+            if (!strcmp(sng_dmn,dmn_nm)){
+              trv_tbl->lst[idx_tbl].var_dmn[idx_var_dmn].flg_rvr=True;
+            }
+          }else{ /* Not -a '-', duplicate user string to use in nco_pth_mch() */
+            sng_dmn=(char *)strdup(usr_sng);
+          }
+
           /* Must meet necessary flags */
-          nco_bool pth_mth=nco_pth_mch(dmn_nm_fll,dmn_nm,usr_sng); 
+          nco_bool pth_mth=nco_pth_mch(dmn_nm_fll,dmn_nm,sng_dmn); 
+
+          /* If does not meet criteria, reverse flag */
+          if(!pth_mth){
+            trv_tbl->lst[idx_tbl].var_dmn[idx_var_dmn].flg_rvr=False;
+          }
+
+          sng_dmn=(char *)nco_free(sng_dmn);
 
           if(pth_mth){
-	    int idx_dmn_out; /* [idx] Index for output dimensions */
-
-	    /* Is dimension already in output array?
-	       Match by dimension ID since dimension IDs are unique */
+            int idx_dmn_out; /* [idx] Index for output dimensions */
+            
+            /* Is dimension already in output array? Match by dimension ID since dimension IDs are unique */
             for(idx_dmn_out=0;idx_dmn_out<nbr_avg_dmn;idx_dmn_out++)
               if(dmn_id == (*dmn_avg)[idx_dmn_out]->id) break;
-	    
-	    /* If this dimension is not yet in output array */
-	    if(idx_dmn_out == nbr_avg_dmn){
-	      
-	      /* Change flag to mark that dimension is to be averaged instead of to keep on output */
-	      trv_tbl->lst[idx_tbl].var_dmn[idx_var_dmn].flg_dmn_avg=True;
-	      
-	      /* Add one more element to array  */
-	      (*dmn_avg)=(dmn_sct **)nco_realloc((*dmn_avg),(nbr_avg_dmn+1)*sizeof(dmn_sct *));
-	      (*dmn_avg)[nbr_avg_dmn]=(dmn_sct *)nco_malloc(sizeof(dmn_sct));
-	      
-	      /* Get size from GTT. NOTE use index idx_var_dmn */
-	      if(trv_obj.var_dmn[idx_var_dmn].is_crd_var){
-		dmn_cnt=trv_obj.var_dmn[idx_var_dmn].crd->lmt_msa.dmn_cnt;
-		dmn_sz=trv_obj.var_dmn[idx_var_dmn].crd->sz;
-		(*dmn_avg)[nbr_avg_dmn]->is_crd_dmn=True;
-	      }else{
-		dmn_cnt=trv_obj.var_dmn[idx_var_dmn].ncd->lmt_msa.dmn_cnt;
-		dmn_sz=trv_obj.var_dmn[idx_var_dmn].ncd->sz;
-		(*dmn_avg)[nbr_avg_dmn]->is_crd_dmn=False;
-	      } /* end else */
-	      
-	      (*dmn_avg)[nbr_avg_dmn]->nm=(char *)strdup(trv_obj.var_dmn[idx_var_dmn].dmn_nm);
-	      (*dmn_avg)[nbr_avg_dmn]->nm_fll=(char *)strdup(trv_obj.var_dmn[idx_var_dmn].dmn_nm_fll);
-	      (*dmn_avg)[nbr_avg_dmn]->id=trv_obj.var_dmn[idx_var_dmn].dmn_id;
-	      (*dmn_avg)[nbr_avg_dmn]->nc_id=nc_id;
-	      (*dmn_avg)[nbr_avg_dmn]->xrf=NULL;
-	      (*dmn_avg)[nbr_avg_dmn]->val.vp=NULL;
-	      (*dmn_avg)[nbr_avg_dmn]->is_rec_dmn=dmn_trv->is_rec_dmn;
-	      (*dmn_avg)[nbr_avg_dmn]->cnt=dmn_cnt;
-	      (*dmn_avg)[nbr_avg_dmn]->sz=dmn_sz;
-	      (*dmn_avg)[nbr_avg_dmn]->srt=0L;
-	      (*dmn_avg)[nbr_avg_dmn]->end=dmn_cnt-1L;
-	      (*dmn_avg)[nbr_avg_dmn]->srd=1L;
-	      
-	      (*dmn_avg)[nbr_avg_dmn]->cid=-1;
-	      (*dmn_avg)[nbr_avg_dmn]->cnk_sz=0L;
-	      (*dmn_avg)[nbr_avg_dmn]->type=(nc_type)-1;
-	      
-	      /* Broadcast flag average/keep using dimension ID; variables share dimensions */
-	      (void)nco_dmn_id_mk(dmn_id,flg_rdd,trv_tbl);
-	      
-	      /* Increment number of dimensions found */
-	      nbr_avg_dmn++;
-	      
-	    } /* If this dimension is not in output array */
-	  } /* Must meet necessary flags */
-	} /* Loop variable dimensions */ 
+            
+            /* If this dimension is not yet in output array */
+            if(idx_dmn_out == nbr_avg_dmn){
+              
+              /* Change flag to mark that dimension is to be averaged instead of to keep on output */
+              trv_tbl->lst[idx_tbl].var_dmn[idx_var_dmn].flg_dmn_avg=True;
+              
+              /* Add one more element to array  */
+              (*dmn_avg)=(dmn_sct **)nco_realloc((*dmn_avg),(nbr_avg_dmn+1)*sizeof(dmn_sct *));
+              (*dmn_avg)[nbr_avg_dmn]=(dmn_sct *)nco_malloc(sizeof(dmn_sct));
+              
+              /* Get size from GTT. NOTE use index idx_var_dmn */
+              if(trv_obj.var_dmn[idx_var_dmn].is_crd_var){
+                dmn_cnt=trv_obj.var_dmn[idx_var_dmn].crd->lmt_msa.dmn_cnt;
+                dmn_sz=trv_obj.var_dmn[idx_var_dmn].crd->sz;
+                (*dmn_avg)[nbr_avg_dmn]->is_crd_dmn=True;
+              }else{
+                dmn_cnt=trv_obj.var_dmn[idx_var_dmn].ncd->lmt_msa.dmn_cnt;
+                dmn_sz=trv_obj.var_dmn[idx_var_dmn].ncd->sz;
+                (*dmn_avg)[nbr_avg_dmn]->is_crd_dmn=False;
+              } /* end else */
+              
+              (*dmn_avg)[nbr_avg_dmn]->nm=(char *)strdup(trv_obj.var_dmn[idx_var_dmn].dmn_nm);
+              (*dmn_avg)[nbr_avg_dmn]->nm_fll=(char *)strdup(trv_obj.var_dmn[idx_var_dmn].dmn_nm_fll);
+              (*dmn_avg)[nbr_avg_dmn]->id=trv_obj.var_dmn[idx_var_dmn].dmn_id;
+              (*dmn_avg)[nbr_avg_dmn]->nc_id=nc_id;
+              (*dmn_avg)[nbr_avg_dmn]->xrf=NULL;
+              (*dmn_avg)[nbr_avg_dmn]->val.vp=NULL;
+              (*dmn_avg)[nbr_avg_dmn]->is_rec_dmn=dmn_trv->is_rec_dmn;
+              (*dmn_avg)[nbr_avg_dmn]->cnt=dmn_cnt;
+              (*dmn_avg)[nbr_avg_dmn]->sz=dmn_sz;
+              (*dmn_avg)[nbr_avg_dmn]->srt=0L;
+              (*dmn_avg)[nbr_avg_dmn]->end=dmn_cnt-1L;
+              (*dmn_avg)[nbr_avg_dmn]->srd=1L;
+              (*dmn_avg)[nbr_avg_dmn]->cid=-1;
+              (*dmn_avg)[nbr_avg_dmn]->cnk_sz=0L;
+              (*dmn_avg)[nbr_avg_dmn]->type=(nc_type)-1;
+        
+              /* Broadcast flag average/keep using dimension ID; variables share dimensions */
+              (void)nco_dmn_id_mk(dmn_id,flg_rdd,trv_tbl);
+        
+              /* Increment number of dimensions found */
+              nbr_avg_dmn++;
+            } /* If this dimension is not in output array */
+          } /* Must meet necessary flags */
+        } /* Loop variable dimensions */ 
       } /* Variable to extract */
     } /* Loop table */
   } /* Loop input dimension name list */
@@ -9974,3 +9979,18 @@ nco_nsm_wrt_att                  /* [fnc] Save ncge metadata attribute */
     } /* end if group and flg_xtr */
   } /* end loop to define group attributes */
 } /* nco_nsm_wrt_att() */
+
+void
+nco_var_xtr_trv                       /* [fnc] Print all variables to extract (debug) */
+(const trv_tbl_sct * const trv_tbl)   /* I [sct] Traversal table */
+{
+  int nbr_xtr=0;
+  /* Loop table */
+  for(unsigned tbl_idx=0;tbl_idx<trv_tbl->nbr;tbl_idx++){
+    /* Filter variables to extract  */
+    if(trv_tbl->lst[tbl_idx].nco_typ == nco_obj_typ_var && trv_tbl->lst[tbl_idx].flg_xtr){
+      (void)fprintf(stdout, "%s\n",trv_tbl->lst[tbl_idx].nm_fll);
+      nbr_xtr++;
+    } /* Filter variables  */
+  } /* Loop table */
+} /* nco_var_xtr_trv() */

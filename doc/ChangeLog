@@ -1,6 +1,22 @@
+2016-02-17  Charlie Zender  <zender@uci.edu>
+
+	* NCO 4.5.5 release procedure:
+	cd ~/nco;git commit -a -m 'Version 4.5.5 final changes';git push
+	git tag -a 4.5.5 -m 'Version 4.5.5 new features: ncremap CCW, gaa, -j, -P mpas; CDF5, mebs nrm, tabs, gaa ncatted ncrename, nces crd mtd';git push --tags
+
+	* Add history attribute to maps produced by ncremap
+
+2016-02-16  Charlie Zender  <zender@uci.edu>
+
+	* Add nco_glb_att_add() and nco_vrs_att_cat() to ncatted, ncrename
+
+2016-02-14  Charlie Zender  <zender@uci.edu>
+
+	* Introduce tabs = total_absolute_value operator and add numerous nces/ncwa regression tests
+
 2016-02-13  Charlie Zender  <zender@uci.edu>
 
-	* Notice and fix mebs off-by-one error in tally accumulated in nco_opr_drv()
+	* Notice and fix mebs off-by-one error in tally accumulated in nco_opr_drv() (again affected ncra/nces not ncwa)
 
 2016-02-12  Charlie Zender  <zender@uci.edu>
 

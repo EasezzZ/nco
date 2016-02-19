@@ -425,13 +425,6 @@ nco_cpy_var_dfn_trv                    /* [fnc] Define specified variable in out
  trv_tbl_sct * const trv_tbl);         /* I/O [sct] GTT (Group Traversal Table) */
 
 void
-nco_dmn_rdr_trv                        /* [fnc] Transfer dimension structures to be re-ordered (ncpdq) into GTT */
-(int **dmn_idx_out_in,                 /* I [idx] Dimension correspondence, output->input, output of nco_var_dmn_rdr_mtd() */
- const int nbr_var_prc,                /* I [nbr] Size of above array (number of processed variables) */
- var_sct **var_prc_out,                /* I [sct] Processed variables */
- trv_tbl_sct * const trv_tbl);         /* I/O [sct] Traversal table */
-
-void
 nco_var_dmn_rdr_mtd_trv               /* [fnc] Determine and set new dimensionality in metadata of each re-ordered variable */
 (trv_tbl_sct * const trv_tbl,         /* I/O [sct] GTT (Group Traversal Table) */
  const int nbr_var_prc,               /* I [nbr] Number of processed variables */
@@ -925,6 +918,16 @@ nco_wrt_atr
  const int grp_out_id,               /* I [id] netCDF output group ID */
  const int var_out_id,               /* I [id] netCDF output variable ID */
  const trv_sct *var_trv);            /* I [sct] traversal variable */
+
+char*
+nco_get_dmn_nm_fll                     /* [fnc] Return dimension name with input id (debug) */
+(const int dmn_id,                     /* I [id] ID of dimension */
+ const dmn_cmn_sct * const dmn_cmn,    /* I [sct] Dimension structure array */
+ const int nbr_dmn);                   /* I [nbr] Number of dimensions (size of above array) */
+
+void
+nco_var_xtr_trv                       /* [fnc] Print all variables to extract (debug) */
+(const trv_tbl_sct * const trv_tbl);  /* I [sct] Traversal table */
 
 #ifdef __cplusplus
 } /* end extern "C" */
