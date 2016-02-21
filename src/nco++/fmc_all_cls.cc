@@ -413,8 +413,7 @@
       // Initial scan
       if(prs_arg->ntl_scn) 
         if(var_tmp)  
-	  var_ret= ncap_sclr_var_mk(SCS
-("~utility_function"),var_tmp->type,false);
+	  var_ret= ncap_sclr_var_mk(SCS ("~utility_function"),var_tmp->type,false);
         else
 	  var_ret=ncap_var_udf("~utility_function");
 
@@ -3331,6 +3330,10 @@ double bil_cls::clc_lin_ipl(double x1,double x2, double x, double Q0,double Q1){
     if(fmc_vtr.empty()){
       fmc_vtr.push_back( fmc_cls("join",this,(int)PJOIN));
       fmc_vtr.push_back( fmc_cls("push",this,(int)PPUSH));
+      fmc_vtr.push_back( fmc_cls("get_vars_in",this,(int)PGET_VARS_IN));
+      fmc_vtr.push_back( fmc_cls("get_vars_out",this,(int)PGET_VARS_OUT));
+      fmc_vtr.push_back( fmc_cls("atoi",this,(int)PATOI));
+      fmc_vtr.push_back( fmc_cls("atol",this,(int)PATOL));
     }
   }
 
@@ -3338,11 +3341,60 @@ double bil_cls::clc_lin_ipl(double x1,double x2, double x, double Q0,double Q1){
   var_sct *vlist_cls::fnd(RefAST expr, RefAST fargs,fmc_cls &fmc_obj, ncoTree &walker){
   const std::string fnc_nm("vlist_cls::fnd");
   bool bret;
+  int fdx;
+  int nbr_args;
+
+  std::string susg;
+  std::string sfnm=fmc_obj.fnm();
+  std::string att_nm;
+
+  RefAST tr;
+  std::vector<RefAST> vtr_args; 
+  prs_cls *prs_arg=walker.prs_arg;
+
+  bool is_mtd;  
+        
+  fdx=fmc_obj.fdx();
+
+
+  // Put args into vector 
+  if(expr)
+    vtr_args.push_back(expr);
+
+  if(tr=fargs->getFirstChild())
+    do  
+      vtr_args.push_back(tr);
+    while(tr=tr->getNextSibling());    
+  
+  
+  is_mtd=(expr ? true: false);
+
+  switch(fdx) 
+  {
+     case PPUSH:  
+       return push_fnd(is_mtd, vtr_args,fmc_obj, walker);   
+       break; 
+
+     case PGET_VARS_IN:  
+     case PGET_VARS_OUT:  
+       return get_fnd(is_mtd, vtr_args,fmc_obj, walker);    
+       break;
+  
+     case PATOI: 
+       return atoi_fnd(is_mtd, vtr_args,fmc_obj, walker);     
+       break;
+  }
+
+  }
+
+
+var_sct *vlist_cls::push_fnd(bool &is_mtd, std::vector<RefAST> &vtr_args, fmc_cls &fmc_obj, ncoTree &walker)
+  {
+  const std::string fnc_nm("push_fnd::fnd");
+  bool bret;
   int idx;
   int fdx;
   int nbr_args;
-  int nbr_dim;         
-  char *cstr;
   std::string susg;
   std::string sfnm=fmc_obj.fnm();
   std::string att_nm;
@@ -3354,25 +3406,12 @@ double bil_cls::clc_lin_ipl(double x1,double x2, double x, double Q0,double Q1){
 
   RefAST aRef;
   RefAST tr;
-  std::vector<RefAST> vtr_args; 
   prs_cls *prs_arg=walker.prs_arg;
 
   NcapVar *Nvar=NULL;
           
   fdx=fmc_obj.fdx();
 
-
-  // Put args into vector 
-  if(expr)
-    vtr_args.push_back(expr);
-
-  if(tr=fargs->getFirstChild())
-  {
-    do  
-      vtr_args.push_back(tr);
-    while(tr=tr->getNextSibling());    
-  } 
-            
   nbr_args=vtr_args.size();  
 
   susg="usage: att_out="+sfnm+"(att_id, att_nm|var_nm|string)";
@@ -3386,17 +3425,17 @@ double bil_cls::clc_lin_ipl(double x1,double x2, double x, double Q0,double Q1){
     nco_string val_string;
     std::string add_nm=vtr_args[1]->getFirstChild()->getText();      
 
-    var_add=ncap_sclr_var_mk(SCS("var_add"), NC_STRING,false ); 
+    var_add=ncap_sclr_var_mk(SCS("~zz@string"), NC_STRING,false ); 
 
     // malloc space directly if final scan
-    if(prs_arg->ntl_scn)
+    if(!prs_arg->ntl_scn)
     {   
        var_add->val.vp=(void*)nco_malloc(nco_typ_lng(NC_STRING));
        cast_void_nctype(NC_STRING, &var_add->val);        
        var_add->val.sngp[0]=strdup(add_nm.c_str());   
        cast_nctype_void(NC_STRING, &var_add->val);        
     }
-      
+           
 
   }
   else 
@@ -3536,12 +3575,272 @@ double bil_cls::clc_lin_ipl(double x1,double x2, double x, double Q0,double Q1){
   }
 
 
+  }
 
+  var_sct *vlist_cls::get_fnd(bool &is_mtd, std::vector<RefAST> &args_vtr, fmc_cls &fmc_obj, ncoTree &walker)
+  {
+  const std::string fnc_nm("push_fnd::fnd");
+  bool bret;
+  int idx;
+  int fdx;
+  int nbr_args;
+  std::string susg;
+  std::string sfnm=fmc_obj.fnm();
+  std::string att_nm;
+
+  var_sct *var=NULL_CEWI;
+  var_sct *var_att=NULL_CEWI;
+  var_sct *var_add=NULL_CEWI;
+  var_sct *var_regexp=NULL_CEWI;
+  
+  nc_type vtype;
+  prs_cls *prs_arg=walker.prs_arg;
+
+  fdx=fmc_obj.fdx();
+
+  nbr_args=args_vtr.size();  
+
+  susg="usage: att_out="+sfnm+"( (regexp|var_nm)? )";
+
+  if(nbr_args<0)
+    err_prn(sfnm, " Function has been called with wrong number of arguments arguments\n"+susg); 
+
+
+  if(nbr_args)
+     var_regexp=walker.out(args_vtr[0]);
+  
+   
+  if(prs_arg->ntl_scn)  
+  { 
+    if(var_regexp)
+      nco_var_free(var_regexp); 
+      
+    var=ncap_var_udf("~zz@join_methods");  
+    return var;
+  }
+    
+
+  if(var_regexp)
+  {
+    vtype=var_regexp->type;
+    if(vtype !=NC_STRING && vtype != NC_CHAR) 
+       err_prn(sfnm,"First argument must be a text type\n" );
+    else
+      cast_void_nctype(vtype,&var_regexp->val);
+  }
+  // no regexp or var list
+  else
+    vtype=NC_NAT;
+
+  
+  // local scope
+  {   
+    int idx;
+    int xtr_nbr;
+    int nbr_var_fl;
+    int fl_id;
+    int rcd;
+    nm_id_sct *xtr_lst; 
+    nco_string *val_str;        
+    char **lst_cp;
+
+    xtr_nbr=0;
+    nbr_var_fl=0;
+    fl_id=0;   
+ 
+    if(fdx==PGET_VARS_IN)
+      fl_id=prs_arg->in_id; 
+    else if(fdx==PGET_VARS_OUT)
+      fl_id=prs_arg->out_id; 
+
+    rcd=nco_inq(fl_id,(int *)NULL,&nbr_var_fl,(int *)NULL,(int*)NULL);
+
+    if(vtype==NC_STRING)
+    {  
+       xtr_nbr=var_regexp->sz;
+       xtr_lst=nco_var_lst_mk(fl_id, nbr_var_fl, var_regexp->val.sngp  , False, False, &xtr_nbr);    
+    }
+
+    if(vtype==NC_CHAR)
+    {
+      char *lcp;   
+      char buffer[1200];
+ 
+      strncpy(buffer, var_regexp->val.cp, var_regexp->sz);   
+      buffer[var_regexp->sz]='\0';
+      lcp=&buffer[0];
+      xtr_nbr=1;
+      xtr_lst=nco_var_lst_mk(fl_id, nbr_var_fl, &lcp  , False, False,&xtr_nbr);       
+    }
+   
+    // extract all vars   
+    if(vtype==NC_NAT) 
+    {
+      xtr_nbr=0; 
+      xtr_lst=nco_var_lst_mk(fl_id, nbr_var_fl, (char**)NULL  , False, False, &xtr_nbr);    
+    }
+
+    var=ncap_sclr_var_mk(SCS("~zz@string"), NC_STRING,false );  
+
+
+    wrn_prn(sfnm,"nbr_var_fl="+nbr2sng(nbr_var_fl)+" xtr_nbr="+nbr2sng(xtr_nbr));
+
+    if(xtr_nbr==0) 
+    {   
+      wrn_prn(sfnm,"this function has returned an empty variable list");
+      var->sz=0;  
+    }
+    else
+    {   
+      val_str=(nco_string*)nco_malloc( xtr_nbr* nco_typ_lng(NC_STRING));
+      var->sz=xtr_nbr;
+    
+      for(idx=0; idx<xtr_nbr;idx++)
+        val_str[idx]=strdup(xtr_lst[idx].nm); 
+      
+      cast_void_nctype(NC_STRING, &var->val);        
+      var->val.sngp=val_str;
+      cast_nctype_void(NC_STRING, &var->val);        
+   
+
+    }
+
+    xtr_lst=nco_nm_id_lst_free(xtr_lst,xtr_nbr);
+
+  }
+  
+  if(var_regexp)
+  {
+    cast_nctype_void(vtype,&var_regexp->val);
+    nco_var_free(var_regexp);
   }
 
 
 
-  var_sct *vlist_cls::fnd_join(RefAST expr, RefAST fargs,fmc_cls &fmc_obj, ncoTree &walker){
+  return var;
+
+  }
+
+  var_sct *vlist_cls::atoi_fnd(bool &is_mtd, std::vector<RefAST> &args_vtr, fmc_cls &fmc_obj, ncoTree &walker)
+  {
+  const std::string fnc_nm("push_fnd::fnd");
+  bool bret;
+  int idx;
+  int fdx;
+  int ierr=0;
+  int nbr_args;
+  char buffer[100];
+  std::string susg;
+  std::string sfnm=fmc_obj.fnm();
+  std::string att_nm;
+   
+  nc_type vtype;
+  var_sct *var=NULL_CEWI;
+  var_sct *var_in=NULL_CEWI;
+  var_sct *var_err=NULL_CEWI;
+
+  prs_cls *prs_arg=walker.prs_arg;
+
+  fdx=fmc_obj.fdx();
+
+  nbr_args=args_vtr.size();  
+
+  susg="usage: att_out="+sfnm+"( nc_char|nc_string  )";
+
+  if(nbr_args<1)
+    err_prn(sfnm, " Function has been called with wrong number of arguments arguments\n"+susg); 
+
+  var_in=walker.out(args_vtr[0]);
+  
+  if(var_in->type != NC_CHAR && var_in->type != NC_STRING)
+        err_prn(sfnm, " Function must be called with a text type argument"+susg); 
+
+  // deal with initial scan      
+  switch(fdx)
+  {
+     case PATOI: 
+       vtype=NC_INT;     
+       break; 
+
+     case PATOL: 
+       vtype=NC_INT64; 
+  }
+
+
+  if(prs_arg->ntl_scn)
+  {
+    var=ncap_sclr_var_mk( SCS("~zz@value_list"), vtype,false); 
+    nco_var_free(var_in);
+    return var; 
+
+  }
+   
+  cast_void_nctype(var_in->type,&var_in->val);
+  if(var_in->type==NC_CHAR)
+  {
+    strncpy(buffer, var_in->val.cp, var_in->sz); 
+    buffer[var_in->sz]='\0';
+  }
+  else if(var_in->type==NC_STRING)
+    strcpy(buffer, var_in->val.sngp[0]); 
+ 
+  cast_nctype_void(var_in->type,&var_in->val);
+  nco_var_free(var_in);
+  
+  
+
+  switch(fdx)
+  {
+     case PATOI: 
+       {          
+         char *pend='\0';
+         nco_int iout;
+         iout=0; 
+
+	 // allows whites space prefix & suffix                                                                                                                                
+         iout=std::strtol(buffer,&pend,10);
+
+         if( pend !=buffer  && (*pend=='\0'|| *pend==' ') )
+            ierr=0;
+         else
+            ierr=errno;
+
+         var=ncap_sclr_var_mk( SCS("~zz@value_list"), vtype,iout);  
+
+       }   
+       break; 
+
+     case PATOL: 
+       {          
+         char *pend='\0';
+         nco_int64 lout;
+         lout=0; 
+
+	 // allows whites space prefix & suffix                                                                                                                                
+         lout=std::strtoll(buffer,&pend,10);
+
+         if( pend !=buffer  && (*pend=='\0'|| *pend==' ') )
+            ierr=0;
+         else
+	   ierr=errno;
+
+         var=ncap_sclr_var_mk( SCS("~zz@value_list"), vtype,lout);  
+
+       }   
+       break; 
+  }
+  
+  var_err=ncap_sclr_var_mk(std::string("~zz@atoi_methods_err"), ierr);
+  prs_arg->ncap_var_write(var_err,true);
+                 
+
+
+
+  return var;
+
+  }
+
+  var_sct *vlist_cls::join_fnd(RefAST expr, RefAST fargs,fmc_cls &fmc_obj, ncoTree &walker){
   const std::string fnc_nm("vlist_cls::fnd");
   int idx;
   int fdx;
@@ -3552,10 +3851,11 @@ double bil_cls::clc_lin_ipl(double x1,double x2, double x, double Q0,double Q1){
   std::string sfnm=fmc_obj.fnm();
   var_sct *var;
   var_sct *var_att;
+  var_sct *var_add;
 
-
-  RefAST aRef;
   RefAST tr;
+  RefAST aRef;
+
   std::vector<RefAST> vtr_args; 
   prs_cls *prs_arg=walker.prs_arg;
   std::vector<std::string> str_vtr;

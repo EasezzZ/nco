@@ -243,12 +243,15 @@ public:
 // var list class /*********************************************************/
 class vlist_cls: public vtl_cls {
 private:
-  enum {PJOIN,PPUSH };
+  enum {PJOIN,PPUSH,PGET_VARS_IN,PGET_VARS_OUT,PATOI,PATOL};
    bool _flg_dbg;
 public:
   vlist_cls(bool flg_dbg);
   var_sct *fnd(RefAST expr, RefAST fargs,fmc_cls &fmc_obj, ncoTree &walker);
-  var_sct *fnd_join(RefAST expr, RefAST fargs,fmc_cls &fmc_obj, ncoTree &walker);
+  var_sct *push_fnd(bool &is_mtd, std::vector<RefAST> &args_vtr, fmc_cls &fmc_obj, ncoTree &walker);  
+  var_sct *get_fnd(bool &is_mtd, std::vector<RefAST> &args_vtr, fmc_cls &fmc_obj, ncoTree &walker);  
+  var_sct *atoi_fnd(bool &is_mtd, std::vector<RefAST> &args_vtr, fmc_cls &fmc_obj, ncoTree &walker);  
+  var_sct *join_fnd(RefAST expr, RefAST fargs,fmc_cls &fmc_obj, ncoTree &walker);
 };
 
 
