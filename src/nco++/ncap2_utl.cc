@@ -365,6 +365,113 @@ ncap_att_prn     /* [fnc] Print a single attribute*/
 } /* end ncap_att_prn() */
 
 
+char * 
+ncap_att_sprn     /* [fnc] Print a single attribute*/
+(var_sct *var,   /* I Variable containing att */
+ char *const att_in_sng) /* user defined format string */
+{
+  char dlm_sng[3];
+  char att_sng[NCO_MAX_LEN_FMT_SNG];
+ 
+  char *tp;
+  char *cp;    
+  char *cp_max;  
+
+  long att_lmn;
+  long att_sz; 
+  long max_sz;
+  
+  /* Copy value to avoid indirection in loop over att_sz */
+  att_sz=var->sz;
+  
+  cp=(char*)nco_calloc(sizeof(char),(NC_MAX_ATTRS+100)); 
+  tp=cp;  
+  cp_max=cp+ (size_t)(NC_MAX_ATTRS+100); 
+
+
+
+  if(att_in_sng ==(char*)NULL) {        
+    (void)sprintf(tp,"%s, size = %li %s, value = ",var->nm,att_sz,nco_typ_sng(var->type));
+    tp+=strlen(tp); 
+    /* Typecast pointer to values before access */
+    (void)strcpy(dlm_sng,", ");
+    (void)sprintf(att_sng,"%s%%s",nco_typ_fmt_sng(var->type));
+    /* user defined format string */ 
+  } else {
+    (void)strcpy(att_sng,att_in_sng);
+    (void)strcpy(dlm_sng,"");
+  }
+      
+  (void)cast_void_nctype(var->type,&var->val);
+
+  
+  switch(var->type){
+  case NC_FLOAT:
+    for(att_lmn=0;att_lmn<att_sz && tp<cp_max ;att_lmn++) { (void)sprintf(tp,att_sng,var->val.fp[att_lmn],(att_lmn != att_sz-1) ? dlm_sng : ""); tp+=strlen(tp); }
+    break;
+  case NC_DOUBLE:
+    for(att_lmn=0;att_lmn<att_sz && tp<cp_max ;att_lmn++) { (void)sprintf(tp,att_sng,var->val.dp[att_lmn],(att_lmn != att_sz-1) ? dlm_sng : "");  tp+=strlen(tp); }
+    break;
+  case NC_SHORT:
+    for(att_lmn=0;att_lmn<att_sz && tp<cp_max;att_lmn++) { (void)sprintf(tp,att_sng,var->val.sp[att_lmn],(att_lmn != att_sz-1) ? dlm_sng : ""); tp+=strlen(tp); }
+    break;
+  case NC_INT:
+    for(att_lmn=0;att_lmn<att_sz && tp<cp_max;att_lmn++) { (void)sprintf(tp,att_sng,(long)var->val.ip[att_lmn],(att_lmn != att_sz-1) ? dlm_sng : ""); tp+=strlen(tp); }
+    break;
+  case NC_CHAR:
+    for(att_lmn=0;att_lmn<att_sz && tp<cp_max ;att_lmn++){
+      char char_foo;
+      /* Assume \0 is string terminator and do not print it */
+      if((char_foo=var->val.cp[att_lmn]) != '\0') (void)sprintf(tp++,"%c",char_foo);   
+         
+    } /* end loop over element */
+    *tp='\0';
+    break;
+  case NC_BYTE:
+    for(att_lmn=0;att_lmn<att_sz && tp<cp_max;att_lmn++) { (void)sprintf(tp,att_sng,var->val.bp[att_lmn], (att_lmn != att_sz-1) ? dlm_sng : ""); tp+=strlen(tp); }
+    break;
+  case NC_UBYTE:
+    for(att_lmn=0;att_lmn<att_sz && tp<cp_max;att_lmn++) { (void)sprintf(tp,att_sng,var->val.ubp[att_lmn], (att_lmn != att_sz-1) ? dlm_sng : ""); tp+=strlen(tp); }
+    break;
+  case NC_USHORT:
+    for(att_lmn=0;att_lmn<att_sz && tp<cp_max;att_lmn++) { (void)sprintf(tp,att_sng,var->val.usp[att_lmn],(att_lmn != att_sz-1) ? dlm_sng : ""); tp+=strlen(tp); }
+    break;
+  case NC_UINT:
+    for(att_lmn=0;att_lmn<att_sz && tp<cp_max;att_lmn++) { (void)sprintf(tp,att_sng,var->val.uip[att_lmn],(att_lmn != att_sz-1) ? dlm_sng : ""); tp+=strlen(tp); }
+    break;
+  case NC_INT64:
+    for(att_lmn=0;att_lmn<att_sz && tp<cp_max;att_lmn++) { (void)sprintf(tp,att_sng,var->val.i64p[att_lmn],(att_lmn != att_sz-1) ? dlm_sng : ""); tp+=strlen(tp); }
+    break;
+  case NC_UINT64:
+    for(att_lmn=0;att_lmn<att_sz && tp<cp_max;att_lmn++) { (void)sprintf(tp,att_sng,var->val.ui64p[att_lmn],(att_lmn != att_sz-1) ? dlm_sng : ""); tp+=strlen(tp); }
+    break;
+  case NC_STRING:
+    for(att_lmn=0;att_lmn<att_sz && tp<cp_max ; att_lmn++) { (void)sprintf(tp,att_sng,var->val.sngp[att_lmn],(att_lmn != att_sz-1) ? dlm_sng : "");tp+=strlen(tp); }
+    break;
+  default: nco_dfl_case_nc_type_err();
+    break;
+  } /* end switch */
+  
+  (void)cast_nctype_void(var->type,&var->val);
+  
+  if( tp >= cp_max )
+  {
+    cp=(char*)nco_realloc(cp, NC_MAX_ATTRS*sizeof(char));     
+    cp[NC_MAX_ATTRS-1]='\0';
+  }
+  else
+  {
+    *tp='\0';
+    cp=(char*)nco_realloc(cp, sizeof(char)* (ptrdiff_t)(tp-cp));     
+  }       
+  
+  return cp;
+
+} /* end ncap_att_prn() */
+
+
+
+
 int          /* number appended */ 
 ncap_att_str /* extract string(s) from a NC_CHAR or NC_STRING type attribute */
 (var_sct *var_att, 

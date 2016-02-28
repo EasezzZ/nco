@@ -127,6 +127,13 @@ ncap_att_prn
 (var_sct *var, 
  char *const att_in_sng);
 
+char *            /* [0] sng - malloced inside function */
+ncap_att_sprn     /* [fnc] Print a single attribute*/
+(var_sct *var,   /* I Variable containing att */
+ char *const att_in_sng); /* user defined format string */
+
+
+
 int                 /* number appended */ 
 ncap_att_str        /* extract string(s) from a NC_CHAR or NC_STRING type attribute */
 (var_sct *var_att,  /* I [sct] input attribute */

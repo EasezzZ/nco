@@ -391,7 +391,7 @@
     } 
      
             
-    lcl_typ=expr_typ(vtr_args[0]);          
+    lcl_typ=expr_typ(vtr_args[0]);         
 
     /* allow att identifier for RAM_DELETE */
     if(lcl_typ !=VVAR && !(fdx == RAM_DELETE && lcl_typ==VATT)) {
@@ -4106,7 +4106,196 @@ var_sct *vlist_cls::push_fnd(bool &is_mtd, std::vector<RefAST> &vtr_args, fmc_cl
 
 
 
+//Print Function family /************************************************/
 
+  print_cls::print_cls(bool flg_dbg){
+    //Populate only on first constructor call
+    if(fmc_vtr.empty()){
+      fmc_vtr.push_back( fmc_cls("print",this,(int)PPRINT));
+      fmc_vtr.push_back( fmc_cls("sprint",this,(int)PSPRINT));
+      fmc_vtr.push_back( fmc_cls("snprint",this,(int)PSNPRINT));
+
+    }
+  }		      
+
+  var_sct *print_cls::fnd(RefAST expr, RefAST fargs,fmc_cls &fmc_obj, ncoTree &walker){
+  const std::string fnc_nm("print_cls::fnd");
+  int fdx;
+  int nbr_args;
+  int idx;
+  int nbr_dim;
+  int avg_nbr_dim; 
+    
+  char *fmt_sng=(char*)NULL;
+  vtl_typ lcl_type;
+  std::string susg;
+  std::string sfnm=fmc_obj.fnm();
+  std::vector<RefAST> vtr_args;             
+  RefAST aRef;
+  RefAST tr;
+
+  // de-reference 
+  ddra_info_sct ddra_info;        
+  prs_cls *prs_arg=walker.prs_arg;
+  var_sct *var =NULL_CEWI;
+  var_sct *var_att=NULL_CEWI; 
+  var_sct *var_fmt=NULL_CEWI; 
+        
+
+  fdx=fmc_obj.fdx();
+ 
+ 
+  // Put args into vector 
+  if(expr)
+    vtr_args.push_back(expr);
+
+  if(tr=fargs->getFirstChild()) {
+    do  
+      vtr_args.push_back(tr);
+    while(tr=tr->getNextSibling());    
+  } 
+
+  nbr_args=vtr_args.size();
+
+  susg="usage: att_out ?="+sfnm+"( att_id|var_id format_string?  )";
+  if( nbr_args <1 ) 
+     err_prn(sfnm, " Function has been called with wrong number of arguments arguments\n"+susg);  
+
+  lcl_type=expr_typ(vtr_args[0]);          
+  
+  if(lcl_type == VVAR && fdx==PPRINT)  
+    var_att=NULL;
+  else
+    var_att=walker.out(vtr_args[0]);       
+
+
+ if(nbr_args>1)
+   var_fmt=walker.out(vtr_args[1]);
+ 
+ if(prs_arg->ntl_scn)
+ {   
+   if(var_att)
+     nco_var_free(var_att);
+   if(var_fmt)
+     nco_var_free(var_fmt);
+
+   var=ncap_var_udf("~zz@print_methods");
+   return  var;
+
+ }
+
+ 
+ if(var_fmt) 
+ {
+   if(var_fmt->type != NC_CHAR && var_fmt->type != NC_STRING) 
+     err_prn(sfnm,"Format string must be a text type");
+
+   cast_void_nctype(var_fmt->type,&var_fmt->val); 
+   fmt_sng=(char*)nco_malloc(sizeof(char)*(var_fmt->sz+1));      
+  
+   if(var_fmt->type==NC_STRING)
+     strcpy(fmt_sng,var_fmt->val.sngp[0]);
+   else
+   {
+     strncpy(fmt_sng,var_fmt->val.cp, var_fmt->sz);  
+     fmt_sng[var_fmt->sz]='\0';   
+   }
+
+  cast_nctype_void(var_fmt->type,&var_fmt->val); 
+
+  nco_var_free(var_fmt);
+ }
+
+ // deal with important special case print && VVAR 
+ if(fdx==PPRINT &&  lcl_type==VVAR )
+ {
+   // check output first -nb can only print out vars that are defined AND written
+   // flg_stt==2 means var defined with data
+   int var_id;
+   int fl_id=-1;
+
+   const char *var_nm;
+   NcapVar *Nvar;
+   var_nm=vtr_args[0]->getText().c_str();
+
+   Nvar=prs_arg->var_vtr.find(var_nm);
+
+  
+    
+
+   if(Nvar && Nvar->flg_stt==2)
+     fl_id=prs_arg->out_id;   
+   else
+    // Check input file for var   
+    if(NC_NOERR==nco_inq_varid_flg(prs_arg->in_id,var_nm,&var_id))
+     fl_id=prs_arg->in_id;
+    
+
+   if(fl_id==-1) 
+   {
+    wrn_prn(fnc_nm,"Print function cannot find var \""+SCS(var_nm)+"\" in input or output");
+    return var;
+   }
+
+   
+   if( fl_id >=0)
+     (void)nco_prn_var_val_lmt(fl_id,var_nm,(lmt_sct*)NULL,0L,fmt_sng,prs_arg->FORTRAN_IDX_CNV,False,False);
+
+   nco_free(fmt_sng);
+   return var;
+ }
+
+
+
+
+
+ switch(fdx)
+ {
+   case PPRINT:
+       ncap_att_prn(var_att,fmt_sng);  
+       var=NULL_CEWI;   
+     break;
+   case PSPRINT:
+     {
+       char *cp;   
+       long sz;  
+       cp=ncap_att_sprn(var_att,fmt_sng);
+       sz=strlen(cp);
+       var=ncap_sclr_var_mk("~zz@print_methods",NC_CHAR,false);    
+       cast_void_nctype(NC_CHAR,&var->val);
+       var->val.cp=(char*) nco_malloc( sizeof(char)*sz);
+       strncpy(var->val.cp,cp,sz);
+       var->sz=sz;
+       cast_nctype_void(NC_CHAR,&var->val);            
+       free(cp);
+     }
+     break; 
+  case PSNPRINT:
+     {
+       char *cp; 
+       long sz;   
+       cp=ncap_att_sprn(var_att,fmt_sng);
+       sz=strlen(cp);  
+       var=ncap_sclr_var_mk("~zz@print_methods",NC_STRING,true);    
+       cast_void_nctype(NC_STRING,&var->val);
+       var->val.sngp[0]=cp;   
+       cast_nctype_void(NC_STRING,&var->val);            
+       var->sz=1; 
+     }
+    break;
+
+ }
+
+ nco_var_free(var_att);
+
+ if(fmt_sng)
+   nco_free(fmt_sng);
+
+
+
+ return var;
+
+}
 
 /* ncap2 functions and methods */
 

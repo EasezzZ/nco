@@ -322,7 +322,7 @@ tokens {
     WHILE="while";    
     FOR="for";
    
-    PRINT="print";  
+    PRINT="printz";  
     DEFDIMA="defdim";
     DEFDIMU="defdimunlim";
  
@@ -445,6 +445,8 @@ DOT options {paraphrase="dot operator";} : '.';
 
 CALL_REF options {paraphrase="call by reference";} : '&';
 
+
+
 protected DGT:     ('0'..'9');
 protected LPH:     ( 'a'..'z' | 'A'..'Z' | '_' );
 protected LPHDGT:  ( 'a'..'z' | 'A'..'Z' | '_' | '0'..'9');
@@ -531,11 +533,13 @@ NUMBER:
 ;
 
 
+
+
 // Return var or att (var_nm@att_nm)
 VAR_ATT options {testLiterals=true; paraphrase="variable or function or attribute identifier"; } 
      :  (LPH)(LPH|DGT)*   
             {
-             // try to intelligently guess the type to avoid un-necessary function search  
+             // try to intelligently guess the type to avoid un-necessary function search    
             bool bDoSearch;
             switch( LA(1) ){
                case ' ': 
@@ -606,6 +610,7 @@ DIM_VAL options { paraphrase="dimension identifier"; }
             { $setType(DIM_ID_SIZE);}
          )? 
    ;  
+
 
 // Shorthand for naming dims in method e.g., $0,$1, $2 etc
 DIM_MTD_ID 

@@ -266,6 +266,18 @@ public:
 };
 
 
+// print  Function family    /***************************************/
+class print_cls: public vtl_cls {
+private:
+  enum{ PPRINT, PSPRINT,PSNPRINT};
+  bool _flg_dbg;
+public:
+  print_cls(bool flg_dbg);
+  var_sct *fnd(RefAST expr, RefAST fargs,fmc_cls &fmc_obj, ncoTree &walker);
+};
+
+
+
 
 
 #endif // FMC_ALL_CLS_HH
