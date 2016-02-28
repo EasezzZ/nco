@@ -909,6 +909,8 @@ nco_rgr_map /* [fnc] Regrid with external weights */
   double *lon_crn_out=NULL; /* [dgr] Longitude corners of rectangular destination grid */
   double *lon_ctr_out=NULL_CEWI; /* [dgr] Longitude centers of rectangular destination grid */
   double *lon_ntf_out=NULL; /* [dgr] Longitude interfaces of rectangular destination grid */
+  double *slat_ctr_out=NULL_CEWI; /* [dgr] Latitude  centers of staggered FV destination grid */
+  double *slon_ctr_out=NULL_CEWI; /* [dgr] Longitude centers of staggered FV destination grid */
   double *wgt_raw; /* [frc] Remapping weights */
   int *col_src_adr; /* [idx] Source address (col) */
   int *row_dst_adr; /* [idx] Destination address (row) */
@@ -968,6 +970,8 @@ nco_rgr_map /* [fnc] Regrid with external weights */
   long col_nbr_out=long_CEWI; /* [nbr] Number of columns in destination grid */
   long lon_nbr_out=long_CEWI; /* [nbr] Number of longitudes in rectangular destination grid */
   long lat_nbr_out=long_CEWI; /* [nbr] Number of latitudes  in rectangular destination grid */
+  long slat_nbr_out=long_CEWI; /* [nbr] Number of latitudes in staggered FV grid destination grid */
+  long slon_nbr_out=long_CEWI; /* [nbr] Number of longitudes in staggered FV grid destination grid */
   if(flg_grd_out_1D){
     bnd_nbr_out=rgr_map.dst_grid_corners;
     col_nbr_out=dmn_sz_out_int[0];
@@ -979,6 +983,8 @@ nco_rgr_map /* [fnc] Regrid with external weights */
     col_nbr_out=lat_nbr_out*lon_nbr_out;
     lat_nbr_out=dmn_sz_out_int[lat_psn_dst];
     lon_nbr_out=dmn_sz_out_int[lon_psn_dst];
+    slat_nbr_out=lat_nbr_out-1L;
+    slon_nbr_out=lon_nbr_out;
     /* Sanity-check */
     assert(lat_nbr_out*lon_nbr_out == (long)grd_sz_out);
   } /* !dst_grid_rank */
@@ -1235,7 +1241,7 @@ nco_rgr_map /* [fnc] Regrid with external weights */
     double lat_ctr_tst_gss;
     /* In diagnosing grids, agreement with input to single-precision is "good enough for government work"
        Hence some comparisons cast from double to float before comparison
-       20150526: T42 grid from SCRIP and related maps are only accurate to ~eight digits
+       20150526: T42 grid from SCRIP and related maps, and NCL-generated Gaussian grids for CESM, are accurate to at most ~eight digits
        20150611: map_ne120np4_to_fv801x1600_bilin.150418.nc has yc_b[1600]=-89.775000006 not expected exact value lat_ctr[1]=-89.775000000000006 */
     if((float)lat_ctr_out[1] == (float)lat_ctr_tst_eqa) nco_grd_lat_typ=nco_grd_lat_eqa;
     if((float)lat_ctr_out[1] == (float)lat_ctr_tst_fv) nco_grd_lat_typ=nco_grd_lat_fv;
@@ -1283,6 +1289,17 @@ nco_rgr_map /* [fnc] Regrid with external weights */
     if(nco_dbg_lvl_get() >= nco_dbg_std) (void)fprintf(stderr,"%s: INFO %s diagnosed output longitude grid-type: %s\n",nco_prg_nm_get(),fnc_nm,nco_grd_lon_sng(nco_grd_lon_typ));
     if(nco_dbg_lvl_get() >= nco_dbg_std) (void)fprintf(stderr,"%s: INFO %s diagnosed output grid-extent: %s\n",nco_prg_nm_get(),fnc_nm,nco_grd_xtn_sng(nco_grd_xtn));
     
+    if(nco_grd_lat_typ == nco_grd_lat_fv){
+      slat_ctr_out=(double *)nco_malloc(slat_nbr_out*nco_typ_lng(crd_typ_out));
+      slon_ctr_out=(double *)nco_malloc(slon_nbr_out*nco_typ_lng(crd_typ_out));
+      for(idx=0;idx<slat_nbr_out;idx++){
+	slat_ctr_out[idx]=lat_ntf_out[idx+1];
+      } /* !lat_nbr_out */
+      for(idx=0;idx<slon_nbr_out;idx++){
+	slon_ctr_out[idx]=lon_ntf_out[idx];
+      } /* !lat_nbr_out */
+    } /* !nco_grd_lat_fv */
+
     switch(nco_grd_lat_typ){
     case nco_grd_lat_eqa:
     case nco_grd_lat_fv:
@@ -1579,11 +1596,12 @@ nco_rgr_map /* [fnc] Regrid with external weights */
   /* Do not extract grid variables (that are also extensive variables) like lon, lat, and area
      If necessary, use remap data to diagnose them from scratch
      Other extensive variables (like counts, population) will be extracted and summed not averaged */
-  const int var_xcl_lst_nbr=37; /* [nbr] Number of objects on exclusion list */
+  const int var_xcl_lst_nbr=40; /* [nbr] Number of objects on exclusion list */
   /* Exception list source:
      AMSR: Latitude, Longitude
      CAM, CERES, CMIP5: lat, lon
      CAM, CMIP5: gw, lat_bnds, lon_bnds
+     CAM-FV: slon, slat, w_stag
      CAM-SE: area
      CICE: latt_bounds, lont_bounds, latu_bounds, lonu_bounds, TLAT, TLON, ULAT, ULON (NB: CICE uses ?LON and POP uses ?LONG)
      ESMF: gridcell_area
@@ -1598,7 +1616,7 @@ nco_rgr_map /* [fnc] Regrid with external weights */
      UV-CDAT regridder: bounds_lat, bounds_lon
      Unknown: XLAT_M, XLONG_M
      WRF: XLAT, XLONG */
-  const char *var_xcl_lst[]={"/area","/areaCell","/gridcell_area","/gw","/LAT","/lat","/latCell","/Latitude","/latitude","/CO_Latitude","/S1_Latitude","/TLAT","/ULAT","/XLAT","/XLAT_M","/lat_bnds","/lat_vertices","/latt_bounds","/latu_bounds","/bounds_lat","/LON","/lon","/lonCell","/Longitude","/longitude","/S1_Longitude","/TLON","/TLONG","/ULON","/ULONG","/XLONG","/XLONG_M","/lon_bnds","/lon_vertices","/lont_bounds","/lonu_bounds","/bounds_lon"};
+  const char *var_xcl_lst[]={"/area","/areaCell","/gridcell_area","/gw","/LAT","/lat","/latCell","/Latitude","/latitude","/CO_Latitude","/slat","/S1_Latitude","/TLAT","/ULAT","/XLAT","/XLAT_M","/lat_bnds","/lat_vertices","/latt_bounds","/latu_bounds","/bounds_lat","/LON","/lon","/lonCell","/Longitude","/longitude","/slon","/S1_Longitude","/TLON","/TLONG","/ULON","/ULONG","/XLONG","/XLONG_M","/lon_bnds","/lon_vertices","/lont_bounds","/lonu_bounds","/bounds_lon","/w_stag"};
   int var_cpy_nbr=0; /* [nbr] Number of copied variables */
   int var_rgr_nbr=0; /* [nbr] Number of regridded variables */
   int var_xcl_nbr=0; /* [nbr] Number of deleted variables */
@@ -1705,8 +1723,12 @@ nco_rgr_map /* [fnc] Regrid with external weights */
   char *lat_wgt_nm;
   char *lon_bnd_nm_out;
   char *lon_nm_out;
+  char *slat_nm_out=NULL;
+  char *slon_nm_out=NULL;
   int dmn_id_bnd; /* [id] Dimension ID */
   int dmn_id_bnd_tm; /* [id] Dimension ID */
+  int dmn_id_slat; /* [id] Dimension ID */
+  int dmn_id_slon; /* [id] Dimension ID */
   int area_out_id; /* [id] Variable ID for area */
   int frc_out_id; /* [id] Variable ID for fraction */
   int lon_out_id; /* [id] Variable ID for longitude */
@@ -1714,6 +1736,8 @@ nco_rgr_map /* [fnc] Regrid with external weights */
   int lat_wgt_id; /* [id] Variable ID for latitude weight */
   int lon_bnd_id; /* [id] Variable ID for lon_bnds/lon_vertices */
   int lat_bnd_id; /* [id] Variable ID for lat_bnds/lat_vertices */
+  int slat_out_id; /* [id] Variable ID for staggered latitude */
+  int slon_out_id; /* [id] Variable ID for staggered longitude */
   int dmn_ids_out[dmn_nbr_grd_max]; /* [id] Dimension IDs array for output variable */
   long dmn_srt_out[dmn_nbr_grd_max];
   long dmn_cnt_tuo[dmn_nbr_grd_max];
@@ -1740,6 +1764,10 @@ nco_rgr_map /* [fnc] Regrid with external weights */
     lat_bnd_nm_out=rgr->lat_bnd_nm;
     lon_bnd_nm_out=rgr->lon_bnd_nm;
   } /* !flg_grd_out_2D */
+  if(nco_grd_lat_typ == nco_grd_lat_fv){
+    slat_nm_out=strdup("slat");
+    slon_nm_out=strdup("slon");
+  } /* !nco_grd_lat_fv */
 
   /* Persistent metadata */
   aed_sct aed_mtd_crd;
@@ -1761,6 +1789,10 @@ nco_rgr_map /* [fnc] Regrid with external weights */
   if(flg_grd_out_2D){
     rcd+=nco_def_dim(out_id,lat_nm_out,lat_nbr_out,&dmn_id_lat);
     rcd+=nco_def_dim(out_id,lon_nm_out,lon_nbr_out,&dmn_id_lon);
+    if(nco_grd_lat_typ == nco_grd_lat_fv){
+      rcd+=nco_def_dim(out_id,slat_nm_out,slat_nbr_out,&dmn_id_slat);
+      rcd+=nco_def_dim(out_id,slon_nm_out,slon_nbr_out,&dmn_id_slon);
+    } /* !nco_grd_lat_fv */
   } /* !flg_grd_out_2D */
   rcd=nco_inq_dimid_flg(out_id,bnd_tm_nm_out,&dmn_id_bnd_tm);
   /* If dimension has not been defined, define it */
@@ -1826,6 +1858,12 @@ nco_rgr_map /* [fnc] Regrid with external weights */
     var_crt_nbr++;
     rcd+=nco_def_var(out_id,lon_nm_out,crd_typ_out,dmn_nbr_1D,&dmn_id_lon,&lon_out_id);
     var_crt_nbr++;
+    if(nco_grd_lat_typ == nco_grd_lat_fv){
+      rcd+=nco_def_var(out_id,slat_nm_out,crd_typ_out,dmn_nbr_1D,&dmn_id_slat,&slat_out_id);
+      var_crt_nbr++;
+      rcd+=nco_def_var(out_id,slon_nm_out,crd_typ_out,dmn_nbr_1D,&dmn_id_slon,&slon_out_id);
+      var_crt_nbr++;
+    } /* !nco_grd_lat_fv */
     dmn_ids_out[0]=dmn_id_lat;
     dmn_ids_out[1]=dmn_id_bnd;
     rcd+=nco_def_var(out_id,lat_bnd_nm_out,crd_typ_out,dmn_nbr_2D,dmn_ids_out,&lat_bnd_id);
@@ -2270,6 +2308,60 @@ nco_rgr_map /* [fnc] Regrid with external weights */
   if(att_nm) att_nm=(char *)nco_free(att_nm);
   if(att_val) att_val=(char *)nco_free(att_val);
 
+  if(nco_grd_lat_typ == nco_grd_lat_fv){
+    att_nm=strdup("long_name");
+    att_val=strdup("latitude for staggered FV grid");
+    aed_mtd.att_nm=att_nm;
+    aed_mtd.var_nm=slat_nm_out;
+    aed_mtd.id=slat_out_id;
+    aed_mtd.sz=strlen(att_val);
+    aed_mtd.type=NC_CHAR;
+    aed_mtd.val.cp=att_val;
+    aed_mtd.mode=aed_create;
+    (void)nco_aed_prc(out_id,slat_out_id,aed_mtd);
+    if(att_nm) att_nm=(char *)nco_free(att_nm);
+    if(att_val) att_val=(char *)nco_free(att_val);
+
+    att_nm=strdup("units");
+    att_val=strdup("degrees_north");
+    aed_mtd.att_nm=att_nm;
+    aed_mtd.var_nm=slat_nm_out;
+    aed_mtd.id=slat_out_id;
+    aed_mtd.sz=strlen(att_val);
+    aed_mtd.type=NC_CHAR;
+    aed_mtd.val.cp=att_val;
+    aed_mtd.mode=aed_create;
+    (void)nco_aed_prc(out_id,slat_out_id,aed_mtd);
+    if(att_nm) att_nm=(char *)nco_free(att_nm);
+    if(att_val) att_val=(char *)nco_free(att_val);
+
+    att_nm=strdup("long_name");
+    att_val=strdup("longitude for staggered FV grid");
+    aed_mtd.att_nm=att_nm;
+    aed_mtd.var_nm=slon_nm_out;
+    aed_mtd.id=slon_out_id;
+    aed_mtd.sz=strlen(att_val);
+    aed_mtd.type=NC_CHAR;
+    aed_mtd.val.cp=att_val;
+    aed_mtd.mode=aed_create;
+    (void)nco_aed_prc(out_id,slon_out_id,aed_mtd);
+    if(att_nm) att_nm=(char *)nco_free(att_nm);
+    if(att_val) att_val=(char *)nco_free(att_val);
+
+    att_nm=strdup("units");
+    att_val=strdup("degrees_east");
+    aed_mtd.att_nm=att_nm;
+    aed_mtd.var_nm=slon_nm_out;
+    aed_mtd.id=slon_out_id;
+    aed_mtd.sz=strlen(att_val);
+    aed_mtd.type=NC_CHAR;
+    aed_mtd.val.cp=att_val;
+    aed_mtd.mode=aed_create;
+    (void)nco_aed_prc(out_id,slon_out_id,aed_mtd);
+    if(att_nm) att_nm=(char *)nco_free(att_nm);
+    if(att_val) att_val=(char *)nco_free(att_val);
+  } /* !nco_grd_lat_fv */
+
   if(flg_grd_out_2D){
     att_nm=strdup("long_name");
     att_val=strdup("latitude quadrature weights (normalized to sum to 2.0 on global grids)");
@@ -2336,6 +2428,11 @@ nco_rgr_map /* [fnc] Regrid with external weights */
   if(att_nm_crd) att_nm_crd=(char *)nco_free(att_nm_crd);
   if(att_val_crd) att_val_crd=(char *)nco_free(att_val_crd);
 
+  if(nco_grd_lat_typ == nco_grd_lat_fv){
+    if(slat_nm_out) slat_nm_out=(char *)nco_free(slat_nm_out);
+    if(slon_nm_out) slon_nm_out=(char *)nco_free(slon_nm_out);
+  } /* !nco_grd_lat_fv */
+  
   /* Begin data mode */
   (void)nco_enddef(out_id);
 
@@ -2383,6 +2480,16 @@ nco_rgr_map /* [fnc] Regrid with external weights */
     dmn_srt_out[0]=0L;
     dmn_cnt_tuo[0]=lon_nbr_out;
     (void)nco_put_vara(out_id,lon_out_id,dmn_srt_out,dmn_cnt_tuo,lon_ctr_out,crd_typ_out);
+    if(nco_grd_lat_typ == nco_grd_lat_fv){
+      dmn_srt_out[0]=0L;
+      dmn_cnt_tuo[0]=slat_nbr_out;
+      (void)nco_put_vara(out_id,slat_out_id,dmn_srt_out,dmn_cnt_tuo,slat_ctr_out,crd_typ_out);
+      dmn_srt_out[0]=0L;
+      dmn_cnt_tuo[0]=slon_nbr_out;
+      (void)nco_put_vara(out_id,slon_out_id,dmn_srt_out,dmn_cnt_tuo,slon_ctr_out,crd_typ_out);
+      if(slat_ctr_out) slat_ctr_out=(double *)nco_free(slat_ctr_out);
+      if(slon_ctr_out) slon_ctr_out=(double *)nco_free(slon_ctr_out);
+    } /* !nco_grd_lat_fv */
     dmn_srt_out[0]=0L;
     dmn_cnt_tuo[0]=lat_nbr_out;
     (void)nco_put_vara(out_id,lat_wgt_id,dmn_srt_out,dmn_cnt_tuo,lat_wgt_out,crd_typ_out);
@@ -3526,26 +3633,25 @@ nco_grd_mk /* [fnc] Create SCRIP-format grid file */
      ESMF_RegridWeightGen -s ${DATA}/grids/ne120np4_pentagons.100310.nc -d ${DATA}/grids/257x512_SCRIP.20150910.nc -w ${DATA}/maps/map_ne120np4_to_fv257x512_aave.20150910.nc --method conserve
      ESMF_RegridWeightGen -s ${DATA}/grids/ne120np4_pentagons.100310.nc -d ${DATA}/grids/801x1600_SCRIP.20150910.nc -w ${DATA}/maps/map_ne120np4_to_fv801x1600_bilin.20150910.nc --method bilinear
 
-     AMWG grids:
-     ncks -O -D 1 --rgr grd_ttl='CAM FV-scalar grid 97x144 for horizontal resolution 1.9x2.5 degrees' --rgr grid=${DATA}/grids/97x144_SCRIP.20160301.nc --rgr latlon=97,144 --rgr lat_typ=cap --rgr lon_typ=Grn_ctr ~/nco/data/in.nc ~/foo.nc
-     ncks -O -D 1 --rgr grd_ttl='CAM FV-scalar grid 193x288 for horizontal resolution 0.9x1.25 degrees' --rgr grid=${DATA}/grids/193x288_SCRIP.20160301.nc --rgr latlon=193,288 --rgr lat_typ=cap --rgr lon_typ=Grn_ctr ~/nco/data/in.nc ~/foo.nc
+     AMWG grids: AMWG diagnostics mis-diagnose FV grids with odd numbers of latitudes as Gaussian Grids
+     ncks -O -D 1 --rgr grd_ttl='CAM FV-scalar grid 96x144 for horizontal resolution 1.9x2.5 degrees' --rgr grid=${DATA}/grids/96x144_SCRIP.20160301.nc --rgr latlon=96,144 --rgr lat_typ=cap --rgr lon_typ=Grn_ctr ~/nco/data/in.nc ~/foo.nc
+     ncks -O -D 1 --rgr grd_ttl='CAM FV-scalar grid 192x288 for horizontal resolution 0.9x1.25 degrees' --rgr grid=${DATA}/grids/192x288_SCRIP.20160301.nc --rgr latlon=192,288 --rgr lat_typ=cap --rgr lon_typ=Grn_ctr ~/nco/data/in.nc ~/foo.nc
+     ncks -O -D 1 --rgr grd_ttl='CAM FV-scalar grid 128x256 for horizontal resolution 1.4x1.4 degrees' --rgr grid=${DATA}/grids/128x256_SCRIP.20160301.nc --rgr latlon=128,256 --rgr lat_typ=cap --rgr lon_typ=Grn_ctr ~/nco/data/in.nc ~/foo.nc
+     ncks -O -D 1 --rgr grd_ttl='CAM FV-scalar grid 256x512 for horizontal resolution 0.7x0.7 degrees' --rgr grid=${DATA}/grids/256x512_SCRIP.20160301.nc --rgr latlon=256,512 --rgr lat_typ=cap --rgr lon_typ=Grn_ctr ~/nco/data/in.nc ~/foo.nc
 
      AMWG maps:
-     ESMF_RegridWeightGen -s ${DATA}/grids/ne30np4_pentagons.091226.nc -d ${DATA}/grids/97x144_SCRIP.20160301.nc -w ${DATA}/maps/map_ne30np4_to_fv97x144_bilin.20160301.nc --method bilinear
-     ESMF_RegridWeightGen -s ${DATA}/grids/ne30np4_pentagons.091226.nc -d ${DATA}/grids/193x288_SCRIP.20160301.nc -w ${DATA}/maps/map_ne30np4_to_fv193x288_bilin.20160301.nc --method bilinear
-     ESMF_RegridWeightGen -s ${DATA}/grids/ne30np4_pentagons.091226.nc -d ${DATA}/grids/97x144_SCRIP.20160301.nc -w ${DATA}/maps/map_ne30np4_to_fv97x144_aave.20160301.nc --method conserve
-     ESMF_RegridWeightGen -s ${DATA}/grids/ne30np4_pentagons.091226.nc -d ${DATA}/grids/193x288_SCRIP.20160301.nc -w ${DATA}/maps/map_ne30np4_to_fv193x288_aave.20160301.nc --method conserve
+     ESMF_RegridWeightGen -s ${DATA}/grids/ne30np4_pentagons.091226.nc -d ${DATA}/grids/128x256_SCRIP.20160301.nc -w ${DATA}/maps/map_ne30np4_to_fv128x256_aave.20160301.nc --method conserve
+     ESMF_RegridWeightGen -s ${DATA}/grids/ne30np4_pentagons.091226.nc -d ${DATA}/grids/256x512_SCRIP.20160301.nc -w ${DATA}/maps/map_ne30np4_to_fv256x512_bilin.20160301.nc --method bilinear
 
-     ncremap -s ${DATA}/grids/ne30np4_pentagons.091226.nc -g ${DATA}/grids/97x144_SCRIP.20160301.nc -m ${DATA}/maps/map_ne30np4_to_fv97x144_bilin.20160301.nc -w esmf -a bilinear
-     ncremap -s ${DATA}/grids/ne30np4_pentagons.091226.nc -g ${DATA}/grids/193x288_SCRIP.20160301.nc -m ${DATA}/maps/map_ne30np4_to_fv193x288_bilin.20160301.nc -w esmf -a bilinear
-     ncremap -s ${DATA}/grids/ne30np4_pentagons.091226.nc -g ${DATA}/grids/97x144_SCRIP.20160301.nc -m ${DATA}/maps/map_ne30np4_to_fv97x144_aave.20160301.nc -w esmf -a conserve
-     ncremap -s ${DATA}/grids/ne30np4_pentagons.091226.nc -g ${DATA}/grids/193x288_SCRIP.20160301.nc -m ${DATA}/maps/map_ne30np4_to_fv193x288_aave.20160301.nc -w esmf -a conserve
+     ncremap -s ${DATA}/grids/ne30np4_pentagons.091226.nc -g ${DATA}/grids/128x256_SCRIP.20160301.nc -m ${DATA}/maps/map_ne30np4_to_fv128x256_aave.20160301.nc -w esmf -a conserve
+     ncremap -s ${DATA}/grids/ne30np4_pentagons.091226.nc -g ${DATA}/grids/256x512_SCRIP.20160301.nc -m ${DATA}/maps/map_ne30np4_to_fv256x512_bilin.20160301.nc -w esmf -a bilinear
 
      MPAS grids:
      NCO cannot yet generate MPAS grids, but given an MPAS grid it can generate appropriate maps
 
      MPAS maps:
      ncremap -s ${DATA}/grids/oEC60to30.SCRIP.150729.nc -g ${DATA}/grids/t62_SCRIP.20150901.nc -m ${DATA}/maps/map_oEC60to30_to_t62_aave.20160301.nc -w esmf -a conserve
+     ncremap -s ${DATA}/grids/oEC60to30.SCRIP.150729.nc -g ${DATA}/grids/t62_SCRIP.20150901.nc -m ${DATA}/maps/map_oEC60to30_to_t62_bilin.20160301.nc -w esmf -a bilinear
 
      Regional RLL grids:
      ncks -O -D 1 --rgr grd_ttl='Equiangular grid 180x360' --rgr grid=${DATA}/sld/rgr/grd_dst.nc --rgr latlon=100,100 --rgr snwe=30.0,70.0,-120.0,-90.0 ~/nco/data/in.nc ~/foo.nc

@@ -113,11 +113,11 @@ Octave TeXInfo manual shows clean TeXInfo structure
 @setfilename nco.info
 
 @c Define edition, date, ...
-@set nco-edition 4.5.5
-@set doc-edition 4.5.5
+@set nco-edition 4.5.6-alpha02
+@set doc-edition 4.5.6-alpha02
 @set copyright-years 1995--2016
 @set update-year 2015
-@set update-date 17 February 2016
+@set update-date 26 February 2016
 @set update-month February 2016
 
 @settitle @acronym{NCO} @value{nco-edition} User Guide
@@ -2437,7 +2437,7 @@ Leaks cause peak memory usage to increase monotonically with time
 regardless of script complexity. 
 Slow leaks are very difficult to find.
 Sometimes a @command{malloc()} (or @command{new[]}) failure is the
-only noticeable clue to their existance.
+only noticeable clue to their existence.
 If you have good reasons to believe that a memory allocation failure  
 is ultimately due to an @acronym{NCO} memory leak (rather than
 inadequate @acronym{RAM} on your system), then we would be very
@@ -15550,7 +15550,7 @@ not rank, while, @command{ncwa} changes both variable size and rank.}.
 In this case the input files to @command{ncbo}, @var{file_1} and
 @var{file_2}, will have unequally sized @code{time} dimensions which
 causes @command{ncbo} to fail.
-To prevent this from occuring, use @command{ncwa} to remove the
+To prevent this from occurring, use @command{ncwa} to remove the
 @code{time} dimension from @var{file_2}.
 See the example below.
 
@@ -18664,13 +18664,18 @@ generate weights and mapfiles.
 In order to use the weight-generation options, ensure that one or both
 of the weight-generation packages is installed and on your
 @code{$PATH}. 
-@acronym{ERWG} is distributed in binary format with @acronym{NCL}, which
-many (most?) @acronym{NCO} users already have on their system(s). 
-@acronym{ERWG} may also be installed from source:
+The recommended way to obtain @acronym{ERWG} is as distributed in binary
+format with @acronym{NCL}, which many (most?) @acronym{NCO} users
+already have on their system(s).
+Then be sure the directory containing the @acronym{ERWG} executable is
+on your @code{$PATH} before using @command{ncremap}.
+As a fallback, @acronym{ERWG} may also be installed from source:
 @url{https://earthsystemcog.org/projects/esmf/download_last_public}.
 @command{ncremap} can also generate and utilize mapfiles created by
 TempestRemap, 
 @url{https://github.com/ClimateGlobalChange/tempestremap}.
+As far as we know TempestRemap must be built from source because there
+are no binary distributions of it. 
 Please contact those projects for support on building and installing
 their software, which makes @command{ncremap} more functional and
 user-friendly.
