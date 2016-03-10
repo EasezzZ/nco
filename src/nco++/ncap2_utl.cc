@@ -356,7 +356,10 @@ ncap_att_prn     /* [fnc] Print a single attribute*/
   default: nco_dfl_case_nc_type_err();
     break;
   } /* end switch */
-  (void)fprintf(stdout,"\n");
+
+  /* only print if format string NOT user defined  */
+  if(att_in_sng ==(char*)NULL)
+      (void)fprintf(stdout,"\n");
   
   (void)cast_nctype_void(var->type,&var->val);
   
@@ -461,8 +464,7 @@ ncap_att_sprn     /* [fnc] Print a single attribute*/
   }
   else
   {
-    *tp='\0';
-    cp=(char*)nco_realloc(cp, sizeof(char)* (ptrdiff_t)(tp-cp));     
+    cp=(char*)nco_realloc(cp, sizeof(char) * (strlen(cp)+1));     
   }       
   
   return cp;
