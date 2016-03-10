@@ -51,7 +51,7 @@
 
 # Process configure input with autoconf to produce configure script
 # (package name,version,bug-report-address,tarball name)
-AC_INIT([NCO netCDF Operators],[4.5.6-alpha03],[nco-bugs@lists.sourceforge.net],[nco])
+AC_INIT([NCO netCDF Operators],[4.5.6-alpha04],[nco-bugs@lists.sourceforge.net],[nco])
 
 # Print GNU copyright in configure script
 AC_COPYRIGHT
@@ -74,7 +74,7 @@ AC_CANONICAL_TARGET
 # Get NCO version
 if test -r doc/VERSION; then
     nco_version=`cat doc/VERSION`
-#  AC_DEFINE_UNQUOTED(VERSION,${nco_version},NCO Version)
+#  AC_DEFINE_UNQUOTED(NCO_VERSION,${nco_version},NCO Version)
 fi
 
 # Set egrep

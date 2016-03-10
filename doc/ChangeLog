@@ -1,3 +1,29 @@
+2016-03-09  Charlie Zender  <zender@uci.edu>
+
+	* Change CPP VERSION token to NCO_VERSION to prevent namespace conflict with other packages
+
+2016-03-08  Charlie Zender  <zender@uci.edu>
+
+	* NCO 4.5.6-alpha04 release procedure:
+	cd ~/nco;git commit -a -m 'Version 4.5.6-alpha04 final changes';git push
+	git tag -a 4.5.6-alpha04 -m 'Version 4.5.6-alpha04 new features: ncremap handles 1D pseudo-rectangular input like OCO2';git push --tags
+
+	* Finalize modifications to handle OCO2 and properly diagnose bad input data
+
+	* Perform branch-cut analysis and CCW correction on pseudo-rectangular input
+
+2016-03-07  Charlie Zender  <zender@uci.edu>
+
+	* OCO2 bounds are given as CW not CCW so must ensure CCW before writing to output
+
+	* Add OCO2 bounds latitude_bnds, longitude_bnds and fixes for 1D-pseudo-rectangular bounds
+
+2016-03-06  Charlie Zender  <zender@uci.edu>
+
+	* Fix Bit-Set algorithm (--baa=2) not to quantize zero upward
+
+	* Fix Bit-Set algorithm (--baa=2) to "or and" not "and and"
+
 2016-03-01  Charlie Zender  <zender@uci.edu>
 
 	* Test automatic double->float conversion for regridding storage to conserve space. Abandon until missing value conversion also done.
@@ -6,7 +32,7 @@
 
 2016-02-29  Charlie Zender  <zender@uci.edu>
 
-	* Modify ncpdq -a option to handle MPAS ice dimensions
+	* Modify ncpdq -a option in ncremap to handle MPAS ice dimensions
 
 	* NCO 4.5.6-alpha03 release procedure:
 	cd ~/nco;git commit -a -m 'Version 4.5.6-alpha03 final changes';git push
