@@ -394,12 +394,19 @@
     lcl_typ=expr_typ(vtr_args[0]);         
 
     /* allow att identifier for RAM_DELETE */
-    if(lcl_typ !=VVAR && !(fdx == RAM_DELETE && lcl_typ==VATT)) {
-      serr="The first operand of the " + sfnm+ " must be a variable identifier only.";
+    if(lcl_typ != VVAR &&  lcl_typ != VPOINTER &&  !(fdx == RAM_DELETE && lcl_typ==VATT)) {
+      serr="The first operand of the " + sfnm+ " must be a variable identifier or a variable pointer only.";
       err_prn(fnc_nm,serr);
     }
 
-    va_nm=vtr_args[0]->getText();
+    if(lcl_typ==VVAR || lcl_typ==VATT )       
+       va_nm=vtr_args[0]->getText();
+    else if(lcl_typ==VPOINTER)
+      { // get contents of att for var-pointer  
+      std::string att_nm=vtr_args[0]->getFirstChild()->getText();
+      va_nm=ncap_att2var(prs_arg,att_nm);
+    }
+
     Nvar=prs_arg->var_vtr.find(va_nm);
 
 
@@ -705,7 +712,7 @@ var_sct * utl_cls::is_fnd(bool &is_mtd, std::vector<RefAST> &args_vtr, fmc_cls &
     if(prs_arg->ntl_scn){
 
       // Evaluate argument on first scan for side-effects eg var1++ or var1+=10 etc 
-      if( lcl_typ!=VVAR && lcl_typ !=VATT){
+      if( lcl_typ!=VVAR && lcl_typ !=VATT && lcl_typ !=VPOINTER){
       var1=walker.out(tr) ;
       var1=nco_var_free(var1);
       }
@@ -713,13 +720,23 @@ var_sct * utl_cls::is_fnd(bool &is_mtd, std::vector<RefAST> &args_vtr, fmc_cls &
     }
        
     // from here on dealing with final scan
-    va_nm=tr->getText();
+    if(lcl_typ==VVAR || lcl_typ==VATT )       
+       va_nm=vtr_args[0]->getText();
+    else if(lcl_typ==VPOINTER)
+      { // get contents of att for var-pointer  
+      std::string att_nm=vtr_args[0]->getFirstChild()->getText();
+      va_nm=ncap_att2var(prs_arg,att_nm);
+    }
+
+
 
 
     // deal with PEXISTS here 
     if(fdx==PEXISTS){
       int iret=0;
       switch(lcl_typ){
+
+      case VPOINTER: 
         case VVAR: 
           if(prs_arg->ncap_var_init_chk(va_nm)) 
             iret=1;
@@ -742,7 +759,7 @@ var_sct * utl_cls::is_fnd(bool &is_mtd, std::vector<RefAST> &args_vtr, fmc_cls &
     }
 
      
-      if(lcl_typ==VVAR)
+      if(lcl_typ==VVAR || lcl_typ==VPOINTER)
 	var1=prs_arg->ncap_var_init(va_nm,false); 
       else 
         var1=walker.out(tr);

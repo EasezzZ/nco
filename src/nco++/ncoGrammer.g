@@ -1152,6 +1152,8 @@ static std::vector<std::string> lpp_vtr;
        if(var != (var_sct*)NULL)
          var=nco_var_free(var);
        iret=FEXPR;
+
+       dbg_prn(fnc_nm,"executed FEXPR "+ fss->getText());    
      }
 
     | #(IF var=out stmt:. ) {

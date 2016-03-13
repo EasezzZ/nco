@@ -31,6 +31,7 @@ b2@three=cos(3.14);
 b2@four=!sin(3.14);
 b3=b2@zero;
 // Check bare numbers are being parsed OK
+c1=four;
 c1@byte=10b;
 c1@short=20s;
 c1@int=30;
@@ -83,7 +84,7 @@ e2=11111.0;
 th=three_dmn_var_dbl;
 f1[$time,$lat]=666;
 f2[$time,$lat,$lon]=time*2;
-f3[$lon]=time(3);
+f3[$lat]=time(3);
 time1=time;
 // hyperslab with RHS a scalar
 f2(9,:,:)=.99;

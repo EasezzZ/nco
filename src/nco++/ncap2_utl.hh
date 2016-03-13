@@ -76,6 +76,11 @@
 
 /* Begin funtions in ncap2_utl.cc */
 
+std::string ncap_att2var
+( prs_cls *prs_arg,   
+  std::string att_nm);
+
+
 var_sct*               /* O [sct] variable containing attribute */
 ncap_att_get	       /*   [fnc] Grab an attribute from input file */	
 (int var_id,           /*   I  var id        */ 

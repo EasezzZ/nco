@@ -89,6 +89,46 @@ ncap_att_get
   return var_ret; 
 }
 
+std::string ncap_att2var
+( prs_cls *prs_arg,   
+  std::string att_nm)
+{
+
+  std::string sn; 
+  var_sct *var_att=NULL_CEWI; 
+  NcapVar *Nvar;
+
+  Nvar=prs_arg->var_vtr.find(att_nm);  
+
+  if(!Nvar)
+    err_prn("Unable to evaluate the attribute "  + att_nm +" as a variable points\n Hint: The attribute should be defined in a previous scope" );
+    
+  var_att=nco_var_dpl(Nvar->var);
+    
+  if(var_att->type !=NC_STRING && var_att->type !=NC_CHAR )
+    err_prn("To use that attribute "+ att_nm +" as a variable pointer it must be a text type  NC_CHAR or NC_STRING"); 
+    
+  cast_void_nctype(var_att->type, &var_att->val );
+  if(var_att->type == NC_STRING)
+  {
+      sn=var_att->val.sngp[0];
+  }
+  else if( var_att->type==NC_CHAR)
+  {        
+      char buffer[100]={'\0'};
+      strncpy(buffer, var_att->val.cp, var_att->sz);
+      sn=buffer;  
+  } 
+ 
+  cast_nctype_void(var_att->type, &var_att->val);
+  nco_var_free(var_att);  
+
+  return sn;
+
+}
+
+
+
 var_sct * /* O [sct] variable containing attribute */
 ncap_att_init /* [fnc] Grab an attribute from input file */
 (const std::string s_va_nm, /* I [sng] att name of form var_nm&att_nm */ 

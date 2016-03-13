@@ -138,7 +138,6 @@ nbr_err_ttl=0;
 
 //hyper-geometric functions
 {
-
   chglon=lon;
   set_miss(chglon,-2000);
 
@@ -148,6 +147,8 @@ nbr_err_ttl=0;
   c3=gsl_sf_hyperg_2F1(2.0,1.0,chglon,0.1);
   c4=gsl_sf_hyperg_2F0(1.5,0.5,chglon/10);
 
+  print(c3);
+  print(c4);
 
   if( fabs(c0.total()-309.23826 ) >0.01){
      print("ERROR: c0:Hypergeometric functions\n");
@@ -163,11 +164,13 @@ nbr_err_ttl=0;
 
 
   if( fabs(c2.total()-2.02375 ) >0.001){
+     c2_err=c2.total()-2.02375;
+     print(c2_err);
      print("ERROR: c2:Hypergeometric functions\n");
      nbr_err++;	
   }
 
-
+    
   if( fabs(c3.total()-3.0041 ) >0.001){
      print("ERROR: c3:Hypergeometric functions\n");
      nbr_err++;	
