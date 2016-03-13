@@ -2790,7 +2790,9 @@ att2var returns [ RefAST tr ]
 
 : (att:ATT_ID) {
 
-      Nvar=prs_arg->var_vtr.find(att->getText());  
+    sn=ncap_att2var(prs_arg,att->getText()); 
+    /*
+    Nvar=prs_arg->var_vtr.find(att->getText());  
 
     if(!Nvar)
         err_prn("Unable to evaluate the attribute "  + att->getText() +" as a variable points\n Hint: The attribute should be defined in a previous scope" );
@@ -2818,9 +2820,15 @@ att2var returns [ RefAST tr ]
     // tr->setType(VAR_ID);       
     //tr->setText(sn);
     //tr=att->clone();
+   */
+
     tr=nco_dupList(att);
-      
-    tr->setType(VAR_ID);       
+    
+    if(sn.find('@') != std::string::npos)
+      tr->setType(ATT_ID);       
+    else
+      tr->setType(VAR_ID);       
+
     tr->setText(sn);
 
     }
