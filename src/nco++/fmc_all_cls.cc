@@ -550,8 +550,8 @@
                  wrn_prn(fnc_nm,sfnm+" cannot remove disk variable:\""+va_nm+ "\". Delete can only remove RAM variables.");
                  rval=0;  
 	        }else{ 
-                 prs_arg->var_vtr.erase(va_nm); 
-                 prs_arg->int_vtr.erase(va_nm); 
+                 prs_arg->var_vtr.erase_all(va_nm); 
+                 prs_arg->int_vtr.erase_all(va_nm); 
                  rval=1;
                }
              } 
