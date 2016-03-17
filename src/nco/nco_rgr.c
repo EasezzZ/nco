@@ -941,11 +941,11 @@ nco_rgr_map /* [fnc] Regrid with external weights */
 
   /* Check-for and workaround faulty Tempest and MPAS-O/I grid sizes */
   if(flg_grd_in_1D && (rgr_map.src_grid_size != dmn_sz_in_int[0])){
-    (void)fprintf(stdout,"%s: WARNING %s reports input grid dimension sizes disagree rgr_map.src_grid_size = %ld != %d = dmn_sz_in[0]. Problem may be caused by incorrect src_grid_dims variable. This is a known issue with some Tempest mapfiles generated prior to ~20150901, and in some ESMF mapfiles for MPAS-O/I. Attempting workaround ...\n",nco_prg_nm_get(),fnc_nm,rgr_map.src_grid_size,dmn_sz_in_int[0]);
+    (void)fprintf(stdout,"%s: INFO %s reports input grid dimension sizes disagree: rgr_map.src_grid_size = %ld != %d = dmn_sz_in[0]. Problem may be caused by incorrect src_grid_dims variable. This is a known issue with some Tempest mapfiles generated prior to ~20150901, and in some ESMF mapfiles for MPAS-O/I. This problem can be safely ignored if workaround succeeds. Attempting workaround ...\n",nco_prg_nm_get(),fnc_nm,rgr_map.src_grid_size,dmn_sz_in_int[0]);
       dmn_sz_in_int[0]=rgr_map.src_grid_size;
   } /* !bug */
   if(flg_grd_out_1D && (rgr_map.dst_grid_size != dmn_sz_out_int[0])){
-    (void)fprintf(stdout,"%s: WARNING %s reports output grid dimension sizes disagree rgr_map.dst_grid_size = %ld != %d = dmn_sz_out[0]. Problem may be caused by incorrect dst_grid_dims variable. This is a known issue with some Tempest mapfiles generated prior to ~20150901, and in some ESMF mapfiles for MPAS-O/I. Attempting workaround ...\n",nco_prg_nm_get(),fnc_nm,rgr_map.dst_grid_size,dmn_sz_out_int[0]);
+    (void)fprintf(stdout,"%s: INFO %s reports output grid dimension sizes disagree: rgr_map.dst_grid_size = %ld != %d = dmn_sz_out[0]. Problem may be caused by incorrect dst_grid_dims variable. This is a known issue with some Tempest mapfiles generated prior to ~20150901, and in some ESMF mapfiles for MPAS-O/I. This problem can be safely ignored if workaround succeeds. Attempting workaround ...\n",nco_prg_nm_get(),fnc_nm,rgr_map.dst_grid_size,dmn_sz_out_int[0]);
     dmn_sz_out_int[0]=rgr_map.dst_grid_size;
   } /* !bug */
  
@@ -3664,14 +3664,20 @@ nco_grd_mk /* [fnc] Create SCRIP-format grid file */
      ncks -O -D 1 --rgr grd_ttl='CAM FV-scalar grid 192x288 for horizontal resolution 0.9x1.25 degrees' --rgr grid=${DATA}/grids/192x288_SCRIP.20160301.nc --rgr latlon=192,288 --rgr lat_typ=cap --rgr lon_typ=Grn_ctr ~/nco/data/in.nc ~/foo.nc
      ncks -O -D 1 --rgr grd_ttl='CAM FV-scalar grid 128x256 for horizontal resolution 1.4x1.4 degrees' --rgr grid=${DATA}/grids/128x256_SCRIP.20160301.nc --rgr latlon=128,256 --rgr lat_typ=cap --rgr lon_typ=Grn_ctr ~/nco/data/in.nc ~/foo.nc
      ncks -O -D 1 --rgr grd_ttl='CAM FV-scalar grid 256x512 for horizontal resolution 0.7x0.7 degrees' --rgr grid=${DATA}/grids/256x512_SCRIP.20160301.nc --rgr latlon=256,512 --rgr lat_typ=cap --rgr lon_typ=Grn_ctr ~/nco/data/in.nc ~/foo.nc
+     ncks -O -D 1 --rgr grd_ttl='CAM FV-scalar grid 800x1600 for horizontal resolution 0.225x0.225 degrees' --rgr grid=${DATA}/grids/800x1600_SCRIP.20160301.nc --rgr latlon=800,1600 --rgr lat_typ=cap --rgr lon_typ=Grn_ctr ~/nco/data/in.nc ~/foo.nc
      ncks -O -D 1 --rgr grd_ttl='Equiangular grid 360x720 produced by RTM' --rgr grid=${DATA}/grids/360x720rtm_SCRIP.20160301.nc --rgr latlon=360,720 --rgr lat_typ=eqa --rgr lon_typ=180_wst ~/nco/data/in.nc ~/foo.nc
 
-     AMWG maps:
+     AMWG maps old method (no provenance archived):
      ESMF_RegridWeightGen -s ${DATA}/grids/ne30np4_pentagons.091226.nc -d ${DATA}/grids/128x256_SCRIP.20160301.nc -w ${DATA}/maps/map_ne30np4_to_fv128x256_aave.20160301.nc --method conserve
      ESMF_RegridWeightGen -s ${DATA}/grids/ne30np4_pentagons.091226.nc -d ${DATA}/grids/256x512_SCRIP.20160301.nc -w ${DATA}/maps/map_ne30np4_to_fv256x512_bilin.20160301.nc --method bilinear
+     ESMF_RegridWeightGen -s ${DATA}/grids/ne30np4_pentagons.091226.nc -d ${DATA}/grids/256x512_SCRIP.20160301.nc -w ${DATA}/maps/map_ne30np4_to_fv256x512_aave.20160301.nc --method conserve
+     ESMF_RegridWeightGen -s ${DATA}/grids/ne30np4_pentagons.091226.nc -d ${DATA}/grids/800x1600_SCRIP.20160301.nc -w ${DATA}/maps/map_ne30np4_to_fv800x1600_bilin.20160301.nc --method bilinear
 
+     AMWG maps with ncremap (preferred method):
      ncremap -s ${DATA}/grids/ne30np4_pentagons.091226.nc -g ${DATA}/grids/128x256_SCRIP.20160301.nc -m ${DATA}/maps/map_ne30np4_to_fv128x256_aave.20160301.nc -w esmf -a conserve
      ncremap -s ${DATA}/grids/ne30np4_pentagons.091226.nc -g ${DATA}/grids/256x512_SCRIP.20160301.nc -m ${DATA}/maps/map_ne30np4_to_fv256x512_bilin.20160301.nc -w esmf -a bilinear
+     ncremap -s ${DATA}/grids/ne120np4_pentagons.100310.nc -g ${DATA}/grids/256x512_SCRIP.20160301.nc -m ${DATA}/maps/map_ne120np4_to_fv256x512_aave.20160301.nc -w esmf -a conserve
+     ncremap -s ${DATA}/grids/ne120np4_pentagons.100310.nc -g ${DATA}/grids/800x1600_SCRIP.20160301.nc -m ${DATA}/maps/map_ne120np4_to_fv800x1600_bilin.20160301.nc -w esmf -a bilinear
 
      MPAS grids:
      NCO cannot yet generate MPAS grids, but given an MPAS grid it can generate appropriate maps
