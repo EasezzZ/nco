@@ -98,8 +98,9 @@ public:
 	public: void call_ref();
 	public: void func_arg();
 	public: void hyper_slb();
-	public: void meth_exp();
+	public: void top_exp();
 	public: void primary_exp();
+	public: void meth_exp();
 	public: void unaryleft_exp();
 	public: void unary_exp();
 	public: void pow_exp();
@@ -124,10 +125,10 @@ protected:
 private:
 	static const char* tokenNames[];
 #ifndef NO_STATIC_CONSTS
-	static const int NUM_TOKENS = 118;
+	static const int NUM_TOKENS = 117;
 #else
 	enum {
-		NUM_TOKENS = 118
+		NUM_TOKENS = 117
 	};
 #endif
 	

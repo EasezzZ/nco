@@ -1,3 +1,31 @@
+2016-03-24  Charlie Zender  <zender@uci.edu>
+
+	* Initialize kvm.val to NULL to handle empty values, e.g., --gaa history=""
+
+2016-03-24  Henry Butowsky  <henryb@hush.com>
+
+	* Attribute propagation from RHS now works with a LHC
+
+2016-03-22  Charlie Zender  <zender@uci.edu>
+
+	* ncremap uses append not overwrite mode
+
+	* ncatted new nappend mode appends only to existing attributes
+
+2016-03-18  Charlie Zender  <zender@uci.edu>
+
+	* NCO 4.5.6-alpha05 release procedure:
+	cd ~/nco;git commit -a -m 'Version 4.5.6-alpha05 final changes';git push
+	git tag -a 4.5.6-alpha05 -m 'Version 4.5.6-alpha05 new features: ncap2 pointers, terraref';git push --tags
+
+	* Add paths for LLNL aims machines to ncremap, climo_nco.sh, climo_ann.sh
+
+2016-03-18  Henry Butowsky  <henryb@hush.com>
+
+	* Removed all print functions from ncoGrammar
+
+	* Print now handled as method by print_cls() in fmc_all_cls.cc
+
 2016-03-09  Charlie Zender  <zender@uci.edu>
 
 	* Change CPP VERSION token to NCO_VERSION to prevent namespace conflict with other packages
