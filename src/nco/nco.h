@@ -322,14 +322,14 @@ extern "C" {
 # define NCO_VERSION_PATCH 6
 #endif /* !NCO_VERSION_PATCH */
 #ifndef NCO_VERSION_NOTE
-# define NCO_VERSION_NOTE  "alpha05" /* Blank for final versions, non-blank (e.g., "beta37") for pre-release versions */
+# define NCO_VERSION_NOTE  "alpha06" /* Blank for final versions, non-blank (e.g., "beta37") for pre-release versions */
 #endif /* !NCO_VERSION_NOTE */
 #ifndef NCO_LIB_VERSION
   /* Define NC_LIB_VERSION as three-digit number for arithmetic comparisons by CPP */
 # define NCO_LIB_VERSION ( NCO_VERSION_MAJOR * 100 + NCO_VERSION_MINOR * 10 + NCO_VERSION_PATCH )
 #endif /* !NCO_LIB_VERSION */
 #ifndef NCO_VERSION
-# define NCO_VERSION "4.5.6-alpha05"
+# define NCO_VERSION "4.5.6-alpha06"
 #endif /* !NCO_VERSION */
 
 /* Compatibility tokens new to netCDF4 netcdf.h: */
@@ -956,6 +956,15 @@ extern "C" {
     nco_bool PRN_VAR_METADATA; /* [flg] Print variable metadata */
   } prn_fmt_sct;
   
+  /* Types used in Terraref structure */
+  typedef enum nco_trr_ntl_typ_enm{ /* [enm] Interleave-type enum */
+    nco_trr_ntl_nil=0,
+    nco_trr_ntl_unk, /* Unknown or unclassified interleave-type */ 
+    nco_trr_ntl_bsq, /* Band Sequential */
+    nco_trr_ntl_bip, /* Band-interleaved-by-pixel */
+    nco_trr_ntl_bil, /* Band-interleaved-by-line */
+  } nco_trr_ntl_typ_enm;
+
   /* Types used in regrid structure */
   typedef enum nco_grd_2D_typ_enm{ /* [enm] Two-dimensional grid-type enum */
     nco_grd_2D_nil=0,
@@ -982,6 +991,35 @@ extern "C" {
     nco_grd_lon_Grn_ctr, /* Greenwich at center of first longitude cell */
     nco_grd_lon_bb, /* Longitude grid determined by bounding box (lon_wst/lon_est) and gridcell number (lon_nbr) */
   } nco_grd_lon_typ_enm;
+
+  /* Terraref structure */
+  typedef struct{ /* trr_sct */
+    // File names specifiable with individual command line switches
+    char *fl_in; /* [sng] File containing raw imagery */
+    char *fl_out; /* [sng] File containing netCDF imagery */
+    char *fl_out_tmp; /* [sng] Temporary file containing netCDF imagery */
+    // Metadata specifiable with key-value syntax
+    char **trr_arg; /* [sng] Terraref arguments */
+    char *wvl_nm; /* [sng] Name of wavelength dimension */
+    char *xdm_nm; /* [sng] Name of x-coordinate dimension */
+    char *ydm_nm; /* [sng] Name of y-coordinate dimension */
+    char *var_nm; /* [sng] Variable containing imagery */
+    char *wvl_bnd_nm; /* [sng] Name of dimension to employ for wavelength bounds */
+    char *xdm_bnd_nm; /* [sng] Name of dimension to employ for x-coordinate bounds */
+    char *ydm_bnd_nm; /* [sng] Name of dimension to employ for y-coordinate bounds */
+    long wvl_nbr; /* [nbr] Number of wavelengths */
+    long xdm_nbr; /* [nbr] Number of pixels in x-dimension */
+    long ydm_nbr; /* [nbr] Number of pixels in y-dimension */
+    nc_type var_typ_in; /* [enm] NetCDF type */
+    nc_type var_typ_out; /* [enm] NetCDF type */
+    // Other internal data and metadata 
+    char *cmd_ln; /* [sng] Command-line */
+    char *ttl; /* [sng] Title */
+    int dfl_lvl; /* [enm] Deflate level [0..9] */
+    int trr_nbr; /* [nbr] Number of Terraref arguments */
+    nco_trr_ntl_typ_enm ntl_typ_in; /* [enm] Interleave-type of raw data */
+    nco_trr_ntl_typ_enm ntl_typ_out; /* [enm] Interleave-type or output */
+  } trr_sct;
 
   /* Regrid structure */
   typedef struct{ /* rgr_sct */

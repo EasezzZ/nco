@@ -9,6 +9,561 @@
 
 #include "nco_sld.h" /* Swath-Like Data */
 
+trr_sct * /* O [sct] Terraref structure */
+nco_trr_ini /* [fnc] Initialize Terraref structure */
+(const char * const cmd_ln, /* I [sng] Command-line */
+ const int dfl_lvl, /* I [enm] Deflate level [0..9] */
+ char **trr_arg, /* I [sng] Terraref arguments */
+ const int trr_arg_nbr, /* I [nbr] Number of Terraref arguments */
+ char * const trr_in, /* I [sng] File containing raw Terraref imagery */
+ char * const trr_out, /* I [sng] File containing netCDF Terraref imagery */
+ char * const trr_wxy) /* I [sng] Terraref dimension sizes */
+{
+  /* Purpose: Initialize regridding structure */
+     
+  const char fnc_nm[]="nco_trr_ini()";
+  
+  int cnv_nbr; /* [nbr] Number of elements converted by sscanf() */
+
+  trr_sct *trr;
+
+  /* Allocate */
+  trr=(trr_sct *)nco_malloc(sizeof(trr_sct));
+  
+  /* Initialize variable directly or indirectly set via command-line (except for key-value arguments) */
+  trr->cmd_ln=strdup(cmd_ln); /* [sng] Command-line */
+  trr->dfl_lvl=dfl_lvl; /* I [enm] Deflate level [0..9] */
+
+  trr->trr_arg=trr_arg; /* [sng] Terraref arguments */
+  trr->trr_nbr=trr_arg_nbr; /* [nbr] Number of Terraref arguments */
+
+  trr->fl_in=trr_in; /* [sng] File containing raw Terrraref imagery */
+  trr->fl_out=trr_out; /* [sng] File containing netCDF Terraref imagery */
+  trr->fl_out_tmp=NULL_CEWI; /* [sng] Temporary file containing netCDF Terraref imagery */
+
+  /* Initialize arguments after copying */
+  if(!trr->fl_out) trr->fl_out=(char *)strdup("/data/zender/terraref/trr_out.nc");
+  
+  if(nco_dbg_lvl_get() >= nco_dbg_crr){
+    (void)fprintf(stderr,"%s: INFO %s reports ",nco_prg_nm_get(),fnc_nm);
+    (void)fprintf(stderr,"trr_nbr = %d, ",trr->trr_nbr);
+    (void)fprintf(stderr,"fl_in = %s, ",trr->fl_in ? trr->fl_in : "NULL");
+    (void)fprintf(stderr,"fl_out = %s, ",trr->fl_out ? trr->fl_out : "NULL");
+    (void)fprintf(stderr,"fl_out_tmp = %s, ",trr->fl_out_tmp ? trr->fl_out_tmp : "NULL");
+    (void)fprintf(stderr,"\n");
+  } /* endif dbg */
+  
+  /* Parse extended kvm options */
+  int trr_arg_idx; /* [idx] Index over trr_arg (i.e., separate invocations of "--trr var1[,var2]=val") */
+  int trr_var_idx; /* [idx] Index over trr_lst (i.e., all names explicitly specified in all "--trr var1[,var2]=val" options) */
+  int trr_var_nbr=0;
+  kvm_sct *trr_lst; /* [sct] List of all regrid specifications */
+  kvm_sct kvm;
+
+  trr_lst=(kvm_sct *)nco_malloc(NC_MAX_VARS*sizeof(kvm_sct));
+
+  /* Parse TRRs */
+  for(trr_arg_idx=0;trr_arg_idx<trr_arg_nbr;trr_arg_idx++){
+    if(!strstr(trr_arg[trr_arg_idx],"=")){
+      (void)fprintf(stdout,"%s: Invalid --trr specification: %s. Must contain \"=\" sign, e.g., \"key=value\".\n",nco_prg_nm_get(),trr_arg[trr_arg_idx]);
+      if(trr_lst) trr_lst=(kvm_sct *)nco_free(trr_lst);
+      nco_exit(EXIT_FAILURE);
+    } /* endif */
+    kvm=nco_sng2kvm(trr_arg[trr_arg_idx]);
+    /* nco_sng2kvm() converts argument "--trr one,two=3" into kvm.key="one,two" and kvm.val=3
+       Then nco_lst_prs_2D() converts kvm.key into two items, "one" and "two", with the same value, 3 */
+    if(kvm.key){
+      int var_idx; /* [idx] Index over variables in current TRR argument */
+      int var_nbr; /* [nbr] Number of variables in current TRR argument */
+      char **var_lst;
+      var_lst=nco_lst_prs_2D(kvm.key,",",&var_nbr);
+      for(var_idx=0;var_idx<var_nbr;var_idx++){ /* Expand multi-variable specification */
+        trr_lst[trr_var_nbr].key=strdup(var_lst[var_idx]);
+        trr_lst[trr_var_nbr].val=strdup(kvm.val);
+        trr_var_nbr++;
+      } /* end for */
+      var_lst=nco_sng_lst_free(var_lst,var_nbr);
+    } /* end if */
+  } /* end for */
+  
+  /* NULL-initialize key-value properties required for string variables */
+  trr->ttl=NULL; /* [sng] Title */
+  trr->wvl_nm=NULL; /* [sng] Name of wavelength dimension */
+  trr->xdm_nm=NULL; /* [sng] Name of x-coordinate dimension */
+  trr->ydm_nm=NULL; /* [sng] Name of y-coordinate dimension */
+  trr->var_nm=NULL; /* [sng] Variable containing imagery */
+  trr->wvl_bnd_nm=NULL; /* [sng] Name of dimension to employ for wavelength bounds */
+  trr->xdm_bnd_nm=NULL; /* [sng] Name of dimension to employ for x-coordinate bounds */
+  trr->ydm_bnd_nm=NULL; /* [sng] Name of dimension to employ for y-coordinate bounds */
+
+  /* Initialize numeric key-value properties used in data processing */
+  trr->var_typ_in=NC_USHORT; /* [enm] NetCDF type-equivalent of binary data (raw imagery) */
+  trr->var_typ_out=NC_USHORT; /* [enm] NetCDF type of data in output file */
+  trr->wvl_nbr=272; /* [nbr] Number of wavelengths */
+  trr->xdm_nbr=384; /* [nbr] Number of pixels in x-dimension */
+  trr->ydm_nbr=893; /* [nbr] Number of pixels in y-dimension */
+  trr->ntl_typ_in=nco_trr_ntl_bil; /* [enm] Interleave-type of raw data */
+  trr->ntl_typ_out=nco_trr_ntl_bsq; /* [enm] Interleave-type of output data */
+
+  /* Initialize variables settable by global switches */
+  if(trr_wxy){
+    cnv_nbr=sscanf(trr_wxy,"%ld,%ld,%ld",&trr->wvl_nbr,&trr->xdm_nbr,&trr->ydm_nbr);
+    assert(cnv_nbr == 3);
+  } /* !trr_wxy */
+
+  /* Parse key-value properties */
+  char *sng_cnv_rcd=NULL_CEWI; /* [sng] strtol()/strtoul() return code */
+  for(trr_var_idx=0;trr_var_idx<trr_var_nbr;trr_var_idx++){
+    if(!strcasecmp(trr_lst[trr_var_idx].key,"ntl_typ_in")){
+      trr->ntl_typ_in=nco_trr_sng_ntl(trr_lst[trr_var_idx].val);
+      continue;
+    } /* !ntl_typ_in */
+    if(!strcasecmp(trr_lst[trr_var_idx].key,"ntl_typ_out")){
+      trr->ntl_typ_out=nco_trr_sng_ntl(trr_lst[trr_var_idx].val);
+      continue;
+    } /* !ntl_typ_out */
+    if(!strcasecmp(trr_lst[trr_var_idx].key,"ttl")){
+      trr->ttl=(char *)strdup(trr_lst[trr_var_idx].val);
+      continue;
+    } /* !ttl */
+    if(!strcasecmp(trr_lst[trr_var_idx].key,"var_nm")){
+      trr->var_nm=(char *)strdup(trr_lst[trr_var_idx].val);
+      continue;
+    } /* !var_nm */
+    if(!strcasecmp(trr_lst[trr_var_idx].key,"var_typ_in")){
+      trr->var_typ_in=nco_sng2typ(trr_lst[trr_var_idx].val);
+      continue;
+    } /* !var_typ_in */
+    if(!strcasecmp(trr_lst[trr_var_idx].key,"var_typ_out")){
+      trr->var_typ_out=nco_sng2typ(trr_lst[trr_var_idx].val);
+      continue;
+    } /* !var_typ_out */
+    if(!strcasecmp(trr_lst[trr_var_idx].key,"wxy")){
+      cnv_nbr=sscanf(trr_lst[trr_var_idx].val,"%ld,%ld,%ld",&trr->wvl_nbr,&trr->xdm_nbr,&trr->ydm_nbr);
+      assert(cnv_nbr == 3);
+      continue;
+    } /* !wxy */
+    if(!strcasecmp(trr_lst[trr_var_idx].key,"wvl_nbr")){
+      trr->wvl_nbr=strtol(trr_lst[trr_var_idx].val,&sng_cnv_rcd,NCO_SNG_CNV_BASE10);
+      if(*sng_cnv_rcd) nco_sng_cnv_err(trr_lst[trr_var_idx].val,"strtol",sng_cnv_rcd);
+      continue;
+    } /* !wvl_nbr */
+    if(!strcasecmp(trr_lst[trr_var_idx].key,"xdm_nbr")){
+      trr->xdm_nbr=strtol(trr_lst[trr_var_idx].val,&sng_cnv_rcd,NCO_SNG_CNV_BASE10);
+      if(*sng_cnv_rcd) nco_sng_cnv_err(trr_lst[trr_var_idx].val,"strtol",sng_cnv_rcd);
+      continue;
+    } /* !xdm_nbr */
+    if(!strcasecmp(trr_lst[trr_var_idx].key,"ydm_nbr")){
+      trr->ydm_nbr=strtol(trr_lst[trr_var_idx].val,&sng_cnv_rcd,NCO_SNG_CNV_BASE10);
+      if(*sng_cnv_rcd) nco_sng_cnv_err(trr_lst[trr_var_idx].val,"strtol",sng_cnv_rcd);
+      continue;
+    } /* !ydm_nbr */
+    if(!strcasecmp(trr_lst[trr_var_idx].key,"wvl_nm")){
+      trr->wvl_nm=(char *)strdup(trr_lst[trr_var_idx].val);
+      continue;
+    } /* !wvl_nm */
+    if(!strcasecmp(trr_lst[trr_var_idx].key,"xdm_nm")){
+      trr->xdm_nm=(char *)strdup(trr_lst[trr_var_idx].val);
+      continue;
+    } /* !xdm_nm */
+    if(!strcasecmp(trr_lst[trr_var_idx].key,"ydm_nm")){
+      trr->ydm_nm=(char *)strdup(trr_lst[trr_var_idx].val);
+      continue;
+    } /* !ydm_nm */
+    if(!strcasecmp(trr_lst[trr_var_idx].key,"wvl_bnd_nm")){
+      trr->wvl_bnd_nm=(char *)strdup(trr_lst[trr_var_idx].val);
+      continue;
+    } /* !wvl_bnd_nm */
+    if(!strcasecmp(trr_lst[trr_var_idx].key,"xdm_bnd_nm")){
+      trr->xdm_bnd_nm=(char *)strdup(trr_lst[trr_var_idx].val);
+      continue;
+    } /* !xdm_bnd_nm */
+    if(!strcasecmp(trr_lst[trr_var_idx].key,"ydm_bnd_nm")){
+      trr->ydm_bnd_nm=(char *)strdup(trr_lst[trr_var_idx].val);
+      continue;
+    } /* !ydm_bnd_nm */
+    (void)fprintf(stderr,"%s: ERROR %s reports unrecognized key-value option to --trr switch: %s\n",nco_prg_nm_get(),fnc_nm,trr_lst[trr_var_idx].key);
+    nco_exit(EXIT_FAILURE);
+  } /* end for */
+  
+  /* Revert to defaults for any names not specified on command-line */
+  if(!trr->ttl) trr->ttl=(char *)strdup("None given (supply with --trr ttl=\"Title\")"); /* [sng] Title */
+  if(!trr->wvl_nm) trr->wvl_nm=(char *)strdup("wavelength"); /* [sng] Name of wavelength dimension */
+  if(!trr->xdm_nm) trr->xdm_nm=(char *)strdup("x"); /* [sng] Name of x-coordinate dimension */
+  if(!trr->ydm_nm) trr->ydm_nm=(char *)strdup("y"); /* [sng] Name of y-coordinate dimension */
+  if(!trr->var_nm) trr->var_nm=(char *)strdup("exposure"); /* [sng] Variable containing imagery */
+  if(!trr->wvl_bnd_nm) trr->wvl_bnd_nm=(char *)strdup("wvl_bnds"); /* [sng] Name of dimension to employ for wavelength bounds */
+  if(!trr->xdm_bnd_nm) trr->xdm_bnd_nm=(char *)strdup("x_bnds"); /* [sng] Name of dimension to employ for x-coordinate bounds */
+  if(!trr->ydm_bnd_nm) trr->ydm_bnd_nm=(char *)strdup("y_bnds"); /* [sng] Name of dimension to employ for y-coordinate bounds */
+  
+  /* Free kvms */
+  if(trr_lst) trr_lst=nco_kvm_lst_free(trr_lst,trr_var_nbr);
+  
+  return trr;
+} /* end nco_trr_ini() */
+
+trr_sct * /* O [sct] Pointer to free'd Terraref structure */
+nco_trr_free /* [fnc] Deallocate Terraref structure */
+(trr_sct *trr) /* I/O [sct] Terraref structure */
+{
+  /* Purpose: Free all dynamic memory in Terraref structure */
+
+  /* free() standalone command-line arguments */
+  if(trr->cmd_ln) trr->cmd_ln=(char *)nco_free(trr->cmd_ln);
+  if(trr->fl_in) trr->fl_in=(char *)nco_free(trr->fl_in);
+  if(trr->fl_out) trr->fl_out=(char *)nco_free(trr->fl_out);
+  if(trr->fl_out_tmp) trr->fl_out_tmp=(char *)nco_free(trr->fl_out_tmp);
+  if(trr->var_nm) trr->var_nm=(char *)nco_free(trr->var_nm);
+
+  /* free() memory used to construct KVMs */
+  if(trr->trr_nbr > 0) trr->trr_arg=nco_sng_lst_free(trr->trr_arg,trr->trr_nbr);
+
+  /* free() memory copied from KVMs */
+  if(trr->ttl) trr->ttl=(char *)nco_free(trr->ttl);
+  if(trr->wvl_nm) trr->wvl_nm=(char *)nco_free(trr->wvl_nm);
+  if(trr->xdm_nm) trr->xdm_nm=(char *)nco_free(trr->xdm_nm);
+  if(trr->ydm_nm) trr->ydm_nm=(char *)nco_free(trr->ydm_nm);
+  if(trr->var_nm) trr->var_nm=(char *)nco_free(trr->var_nm);
+  if(trr->wvl_bnd_nm) trr->wvl_bnd_nm=(char *)nco_free(trr->wvl_bnd_nm);
+  if(trr->xdm_bnd_nm) trr->xdm_bnd_nm=(char *)nco_free(trr->xdm_bnd_nm);
+  if(trr->ydm_bnd_nm) trr->ydm_bnd_nm=(char *)nco_free(trr->ydm_bnd_nm);
+
+  /* Lastly, free() regrid structure itself */
+  if(trr) trr=(trr_sct *)nco_free(trr);
+
+  return trr;
+} /* end nco_trr_free() */
+  
+int /* O [rcd] Return code */
+nco_trr_read /* [fnc] Read, parse, and print contents of TERRAREF file */
+(trr_sct *trr) /* I/O [sct] Terraref information */
+{
+  /* Purpose: Read TERRAREF file */
+  const char fnc_nm[]="nco_trr_read()"; /* [sng] Function name */
+
+  const int dmn_nbr_3D=3; /* [nbr] Rank of 3-D grid variables */
+  const int dmn_nbr_grd_max=dmn_nbr_3D; /* [nbr] Maximum rank of grid variables */
+
+  //  const nc_type crd_typ=NC_FLOAT;
+
+  char *fl_in;
+  char *fl_out;
+  char *fl_out_tmp=NULL_CEWI;
+  char *var_nm;
+  char *wvl_nm;
+  char *xdm_nm;
+  char *ydm_nm;
+
+  FILE *fp_in=NULL; /* [fl] Unformatted binary input file handle */
+
+  int dmn_ids[dmn_nbr_grd_max]; /* [id] Dimension IDs array for output variable */
+
+  int dmn_idx_wvl; /* [idx] Index of wavelength dimension */
+  int dmn_idx_ydm; /* [idx] Index of y-coordinate dimension */
+  int dmn_idx_xdm; /* [idx] Index of x-coordinate dimension */
+  int dmn_id_wvl; /* [id] Wavelength dimension ID */
+  int dmn_id_xdm; /* [id] X-dimension ID */
+  int dmn_id_ydm; /* [id] Y-dimension ID */
+  int dfl_lvl; /* [enm] Deflate level [0..9] */
+  int fl_out_fmt=NC_FORMAT_NETCDF4; /* [enm] Output file format */
+  int out_id; /* I [id] Output netCDF file ID */
+  int rcd=NC_NOERR;
+  int var_id; /* [id] Current variable ID */
+
+  long dmn_srt[dmn_nbr_grd_max];
+  long dmn_cnt[dmn_nbr_grd_max];
+
+  long wvl_nbr; /* [nbr] Number of wavelengths */
+  long xdm_nbr; /* [nbr] Number of pixels in x-dimension */
+  long ydm_nbr; /* [nbr] Number of pixels in y-dimension */
+  long wvl_idx;
+  long ydm_idx;
+  long var_sz; /* [nbr] Size of variable */
+
+  nc_type var_typ_in; /* [enm] NetCDF type-equivalent of binary data (raw imagery) */
+  nc_type var_typ_out; /* [enm] NetCDF type of data in output file */
+
+  nco_bool FORCE_APPEND=False; /* Option A */
+  nco_bool FORCE_OVERWRITE=True; /* Option O */
+  nco_bool RAM_CREATE=False; /* [flg] Create file in RAM */
+  nco_bool RAM_OPEN=False; /* [flg] Open (netCDF3-only) file(s) in RAM */
+  nco_bool WRT_TMP_FL=False; /* [flg] Write output to temporary file */
+
+  size_t bfr_sz_hnt=NC_SIZEHINT_DEFAULT; /* [B] Buffer size hint */
+
+  nco_trr_ntl_typ_enm ntl_typ_in; /* [enm] Interleave-type of raw data */
+  nco_trr_ntl_typ_enm ntl_typ_out; /* [enm] Interleave-type of output data */
+
+  ptr_unn var_raw;
+  ptr_unn var_val;
+  
+  /* Initialize local copies of command-line values */
+  fl_in=trr->fl_in;
+  fl_out=trr->fl_out;
+  var_nm=trr->var_nm;
+  wvl_nm=trr->wvl_nm;
+  xdm_nm=trr->xdm_nm;
+  ydm_nm=trr->ydm_nm;
+  
+  wvl_nbr=trr->wvl_nbr; /* bands */
+  xdm_nbr=trr->xdm_nbr; /* samples */
+  ydm_nbr=trr->ydm_nbr; /* lines */
+
+  ntl_typ_in=trr->ntl_typ_in; /* [enm] Interleave-type of raw data */
+  ntl_typ_out=trr->ntl_typ_out; /* [enm] Interleave-type of output data */
+
+  var_typ_in=trr->var_typ_in; /* [enm] NetCDF type-equivalent of binary data (raw imagery) */
+  var_typ_out=trr->var_typ_out; /* [enm] NetCDF type of data in output file */
+
+  dfl_lvl=trr->dfl_lvl;
+
+  if(nco_dbg_lvl_get() >= nco_dbg_std){
+    (void)fprintf(stderr,"%s: INFO %s Terraref metadata: ",nco_prg_nm_get(),fnc_nm);
+    (void)fprintf(stderr,"wvl_nbr = %li, xdm_nbr = %li, ydm_nbr = %li, ntl_typ_in = %s, ntl_typ_out = %s, var_typ_in = %s, var_typ_out = %s\n",wvl_nbr,xdm_nbr,ydm_nbr,nco_trr_ntl_sng(ntl_typ_in),nco_trr_ntl_sng(ntl_typ_out),nco_typ_sng(var_typ_in),nco_typ_sng(var_typ_out));
+  } /* endif dbg */
+
+  var_sz=wvl_nbr*xdm_nbr*ydm_nbr;
+  var_val.vp=(void *)nco_malloc(var_sz*nctypelen(var_typ_in));
+  var_raw.vp=(void *)nco_malloc(var_sz*nctypelen(var_typ_in));
+  
+  /* [fnc] Open unformatted binary data file for reading */
+  fp_in=nco_bnr_open(fl_in,"r");
+      
+  /* [fnc] Read unformatted binary data */
+  nco_bnr_rd(fp_in,var_nm,var_sz,var_typ_in,var_raw.vp);
+
+  /* [fnc] Close unformatted binary data file */
+  if(fp_in) (void)nco_bnr_close(fp_in,fl_in);
+
+  /* ENVI Image Files documentation:
+     http://www.harrisgeospatial.com/docs/enviimagefiles.html
+     Band Sequential: BSQ format is the simplest format, where each line of the data is followed immediately by the next line in the same spectral band. This format is optimal for spatial (x,y) access of any part of a single spectral band.
+     Band-interleaved-by-pixel: BIP format stores the first pixel for all bands in sequential order, followed by the second pixel for all bands, followed by the third pixel for all bands, and so forth, interleaved up to the number of pixels. This format provides optimum performance for spectral (z) access of the image data.
+     Band-interleaved-by-line: BIL format stores the first line of the first band, followed by the first line of the second band, followed by the first line of the third band, interleaved up to the number of bands. Subsequent lines for each band are interleaved in similar fashion. This format provides a compromise in performance between spatial and spectral processing and is the recommended file format for most ENVI processing tasks. */
+
+  if(ntl_typ_in == nco_trr_ntl_bil && ntl_typ_out == nco_trr_ntl_bsq){
+    /* De-interleave */
+    long ln_sz; /* [nbr] Number of pixels in line */
+    long ln_sz_byt; /* [B] Number of bytes in line */
+    long img_sz_byt; /* [B] Image size in bytes */
+    long src_fst_byt; /* [B] Line offset in bytes, source */
+    long dst_fst_byt; /* [B] Line offset in bytes, destination */
+    
+    ln_sz=xdm_nbr;
+    ln_sz_byt=ln_sz*nctypelen(var_typ_in);
+    img_sz_byt=xdm_nbr*ydm_nbr*nctypelen(var_typ_in);
+    
+    if(nco_dbg_lvl_get() >= nco_dbg_std) (void)fprintf(stderr,"%s: INFO %s de-interleaving input image from ENVI type %s\n",nco_prg_nm_get(),fnc_nm,nco_trr_ntl_sng(ntl_typ_in));
+    for(ydm_idx=0;ydm_idx<ydm_nbr;ydm_idx++){
+      for(wvl_idx=0;wvl_idx<wvl_nbr;wvl_idx++){
+	src_fst_byt=(ydm_idx*wvl_nbr+wvl_idx)*ln_sz_byt;
+	dst_fst_byt=wvl_idx*img_sz_byt+ydm_idx*ln_sz_byt;
+	memcpy((void *)(var_val.cp+dst_fst_byt),(void *)(var_raw.cp+src_fst_byt),ln_sz_byt);
+      } /* !wvl_idx */
+    } /* !ydm_idx */
+  }else{
+    if(var_val.vp) var_val.vp=(void *)nco_free(var_val.vp);
+    var_val.vp=var_raw.vp;
+    var_raw.vp=NULL;
+  } /* !ntl_bil */
+
+  if(nco_dbg_lvl_get() >= nco_dbg_std){
+    if(var_typ_in == NC_USHORT){
+      long idx;
+      double val_min;
+      double val_max;
+      double val_avg;
+      val_min=var_val.usp[0];
+      val_max=var_val.usp[0];
+      val_avg=0.0;
+      for(idx=0;idx<var_sz;idx++){
+	if(var_val.usp[idx] < val_min) val_min=var_val.usp[idx];
+	if(var_val.usp[idx] > val_max) val_max=var_val.usp[idx];
+	val_avg+=var_val.usp[idx];
+      } /* !idx */
+      val_avg/=var_sz;
+      (void)fprintf(stderr,"%s: INFO %s image diagnostics: min=%g, max=%g, avg=%g\n",nco_prg_nm_get(),fnc_nm,val_min,val_max,val_avg);
+    } /* !NC_USHORT */
+  } /* !dbg */
+
+    /* Free input data memory */
+  if(var_raw.vp) var_raw.vp=(void *)nco_free(var_raw.vp);
+
+  /* Open grid file */  
+  fl_out_tmp=nco_fl_out_open(fl_out,&FORCE_APPEND,FORCE_OVERWRITE,fl_out_fmt,&bfr_sz_hnt,RAM_CREATE,RAM_OPEN,WRT_TMP_FL,&out_id);
+
+  /* Define dimensions */
+  rcd=nco_def_dim(out_id,wvl_nm,wvl_nbr,&dmn_id_wvl);
+  rcd=nco_def_dim(out_id,xdm_nm,xdm_nbr,&dmn_id_xdm);
+  rcd=nco_def_dim(out_id,ydm_nm,ydm_nbr,&dmn_id_ydm);
+  
+  /* Define variables */
+  if(ntl_typ_out == nco_trr_ntl_bsq){
+    /* Band-sequential order */
+    dmn_idx_wvl=0;
+    dmn_idx_ydm=1;
+    dmn_idx_xdm=2;
+  }else if(ntl_typ_out == nco_trr_ntl_bip){
+    /* Band-interleaved-by-pixel order */
+    dmn_idx_wvl=2;
+    dmn_idx_ydm=0;
+    dmn_idx_xdm=1;
+  }else if(ntl_typ_out == nco_trr_ntl_bil){
+    /* Band-interleaved-by-line order */
+    dmn_idx_wvl=1;
+    dmn_idx_ydm=0;
+    dmn_idx_xdm=2;
+  } /* !ntl_typ_out */
+  dmn_ids[dmn_idx_wvl]=dmn_id_wvl;
+  dmn_ids[dmn_idx_xdm]=dmn_id_xdm;
+  dmn_ids[dmn_idx_ydm]=dmn_id_ydm;
+  dmn_cnt[dmn_idx_wvl]=wvl_nbr;
+  dmn_cnt[dmn_idx_xdm]=xdm_nbr;
+  dmn_cnt[dmn_idx_ydm]=ydm_nbr;
+
+  (void)nco_def_var(out_id,var_nm,var_typ_out,dmn_nbr_3D,dmn_ids,&var_id);
+
+  if(dfl_lvl > 0){
+    int shuffle; /* [flg] Turn on shuffle filter */
+    int deflate; /* [flg] Turn on deflate filter */
+    deflate=(int)True;
+    shuffle=NC_SHUFFLE;
+    (void)nco_def_var_deflate(out_id,var_id,deflate,shuffle,dfl_lvl);
+  } /* !dfl_lvl */
+  
+  /* Define "units" attributes */
+  aed_sct aed_mtd;
+  char *att_nm;
+  char *att_val;
+  
+  att_nm=strdup("title");
+  att_val=strdup(trr->ttl);
+  aed_mtd.att_nm=att_nm;
+  aed_mtd.var_nm=NULL;
+  aed_mtd.id=NC_GLOBAL;
+  aed_mtd.sz=strlen(att_val);
+  aed_mtd.type=NC_CHAR;
+  aed_mtd.val.cp=att_val;
+  aed_mtd.mode=aed_create;
+  (void)nco_aed_prc(out_id,NC_GLOBAL,aed_mtd);
+  if(att_nm) att_nm=(char *)nco_free(att_nm);
+  if(att_val) att_val=(char *)nco_free(att_val);
+  
+  const char usr_cpp[]=TKN2SNG(USER); /* [sng] Hostname from C pre-processor */
+  att_nm=strdup("created_by");
+  att_val=strdup(usr_cpp);
+  aed_mtd.att_nm=att_nm;
+  aed_mtd.var_nm=NULL;
+  aed_mtd.id=NC_GLOBAL;
+  aed_mtd.sz=strlen(att_val);
+  aed_mtd.type=NC_CHAR;
+  aed_mtd.val.cp=att_val;
+  aed_mtd.mode=aed_create;
+  (void)nco_aed_prc(out_id,NC_GLOBAL,aed_mtd);
+  if(att_nm) att_nm=(char *)nco_free(att_nm);
+  if(att_val) att_val=(char *)nco_free(att_val);
+  
+  att_nm=strdup("history");
+  att_val=strdup(trr->cmd_ln);
+  aed_mtd.att_nm=att_nm;
+  aed_mtd.var_nm=NULL;
+  aed_mtd.id=NC_GLOBAL;
+  aed_mtd.sz=strlen(att_val);
+  aed_mtd.type=NC_CHAR;
+  aed_mtd.val.cp=att_val;
+  aed_mtd.mode=aed_create;
+  (void)nco_aed_prc(out_id,NC_GLOBAL,aed_mtd);
+  if(att_nm) att_nm=(char *)nco_free(att_nm);
+  if(att_val) att_val=(char *)nco_free(att_val);
+  
+  att_nm=strdup("long_name");
+  att_val=strdup("Exposure");
+  aed_mtd.att_nm=att_nm;
+  aed_mtd.var_nm=var_nm;
+  aed_mtd.id=var_id;
+  aed_mtd.sz=strlen(att_val);
+  aed_mtd.type=NC_CHAR;
+  aed_mtd.val.cp=att_val;
+  aed_mtd.mode=aed_create;
+  (void)nco_aed_prc(out_id,var_id,aed_mtd);
+  if(att_nm) att_nm=(char *)nco_free(att_nm);
+  if(att_val) att_val=(char *)nco_free(att_val);
+  
+  att_nm=strdup("meaning");
+  att_val=strdup("Exposure on scale from 0 to 2^16-1 = 65535");
+  aed_mtd.att_nm=att_nm;
+  aed_mtd.var_nm=var_nm;
+  aed_mtd.id=var_id;
+  aed_mtd.sz=strlen(att_val);
+  aed_mtd.type=NC_CHAR;
+  aed_mtd.val.cp=att_val;
+  aed_mtd.mode=aed_create;
+  (void)nco_aed_prc(out_id,var_id,aed_mtd);
+  if(att_nm) att_nm=(char *)nco_free(att_nm);
+  if(att_val) att_val=(char *)nco_free(att_val);
+  
+  att_nm=strdup("units");
+  att_val=strdup("1");
+  aed_mtd.att_nm=att_nm;
+  aed_mtd.var_nm=var_nm;
+  aed_mtd.id=var_id;
+  aed_mtd.sz=strlen(att_val);
+  aed_mtd.type=NC_CHAR;
+  aed_mtd.val.cp=att_val;
+  aed_mtd.mode=aed_create;
+  (void)nco_aed_prc(out_id,var_id,aed_mtd);
+  if(att_nm) att_nm=(char *)nco_free(att_nm);
+  if(att_val) att_val=(char *)nco_free(att_val);
+  
+  /* Begin data mode */
+  (void)nco_enddef(out_id);
+  
+  /* Write variables */
+  dmn_srt[0]=0L;
+  dmn_srt[1]=0L;
+  dmn_srt[2]=0L;
+  rcd=nco_put_vara(out_id,var_id,dmn_srt,dmn_cnt,var_val.vp,var_typ_in);
+
+  /* Close output file and move it from temporary to permanent location */
+  (void)nco_fl_out_cls(fl_out,fl_out_tmp,out_id);
+
+  /* Free output data memory */
+  if(var_val.vp) var_val.vp=(void *)nco_free(var_val.vp);
+
+  return rcd;
+} /* end nco_trr_read() */
+  
+nco_trr_ntl_typ_enm /* O [enm] Interleave-type */
+nco_trr_sng_ntl /* [fnc] Convert user-supplied string to interleave-type enum */
+(const char * const typ_sng) /* I [sng] String indicating interleave-type */
+{
+  /* Purpose: Convert user-supplied string to interleave-type */
+  const char fnc_nm[]="nco_trr_sng_ntl()";
+  
+  if(!strcasecmp(typ_sng,"bsq") || !strcasecmp(typ_sng,"band_sequential")) return nco_trr_ntl_bsq;
+  else if(!strcasecmp(typ_sng,"bip") || !strcasecmp(typ_sng,"band_interleaved_by_pixel")) return nco_trr_ntl_bip;
+  else if(!strcasecmp(typ_sng,"bil") || !strcasecmp(typ_sng,"band_interleaved_by_line")) return nco_trr_ntl_bil;
+  else abort();
+  
+  return nco_trr_ntl_unk;
+} /* end nco_trr_sng_ntl() */
+
+const char * /* O [sng] String describing interleave-type */
+nco_trr_ntl_sng /* [fnc] Convert interleave-type enum to string */
+(const nco_trr_ntl_typ_enm nco_trr_ntl_typ) /* I [enm] Interleave-type enum */
+{
+  /* Purpose: Convert interleave-type enum to string */
+  switch(nco_trr_ntl_typ){
+  case nco_trr_ntl_bsq: return "band_sequential (BSQ format)";
+  case nco_trr_ntl_bip: return "band_interleaved_by_pixel (BIP format)";
+  case nco_trr_ntl_bil: return "band_interleaved_by_line (BIL format)";
+  default: nco_dfl_case_generic_err(); break;
+  } /* end switch */
+
+  /* Some compilers: e.g., SGI cc, need return statement to end non-void functions */
+  return (char *)NULL;
+} /* end nco_trr_ntl_sng() */
+
 int /* O [rcd] Return code */
 nco_scrip_read /* [fnc] Read, parse, and print contents of SCRIP file */
 (char *fl_scrip, /* SCRIP file name with proper path */
